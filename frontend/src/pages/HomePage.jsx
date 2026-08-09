@@ -8,6 +8,12 @@ import PlayerCard from "../components/PlayerCard";
 import { api } from "../api/endpoints";
 import { useAuth } from "../context/AuthContext";
 
+// Debe coincidir con la regla de CalibrationList.jsx: un objetivo desaparece
+// del todo solo si ya está calibrado y (si tenía evaluadores asignados) todos
+// ellos ya han votado.
+const isFullyResolved = (p) =>
+  p.calibrated && (p.assigned_voters_count === 0 || p.initial_votes_count >= p.assigned_voters_count);
+
 export default function HomePage() {
   const { user, profile } = useAuth();
   const [matches, setMatches] = useState([]);
@@ -35,11 +41,17 @@ export default function HomePage() {
   useEffect(() => {
     (async () => {
       const res = await api.listPlayers();
-      const uncalibrated = res.data.filter((p) => !p.calibrated && p.id !== profile?.id);
-      const pending = user?.is_staff
-        ? uncalibrated
-        : uncalibrated.filter((p) => p.assigned_voter_ids.includes(user?.id));
-      setPendingCalibration(pending.length);
+      const notMe = res.data.filter((p) => p.id !== profile?.id && !isFullyResolved(p));
+
+      if (user?.is_staff) {
+        setPendingCalibration(notMe.length);
+        return;
+      }
+
+      const assignedToMe = notMe.filter((p) => p.assigned_voter_ids.includes(user?.id));
+      const votes = await Promise.all(assignedToMe.map((t) => api.listInitialVotes(t.id)));
+      const notVotedYet = assignedToMe.filter((_, i) => !votes[i].data.some((v) => v.voter === user?.id));
+      setPendingCalibration(notVotedYet.length);
     })();
   }, [user?.id, profile?.id]);
 

@@ -1,4 +1,5 @@
 from django.contrib.auth import get_user_model
+from django.db import transaction
 from django.shortcuts import get_object_or_404
 from rest_framework import permissions, status, viewsets
 from rest_framework.decorators import action
@@ -8,6 +9,7 @@ from rest_framework.views import APIView
 from . import services
 from .models import EvaluatorAssignment, InitialVote, Match, MatchPlayer, MatchVote, PlayerProfile
 from .serializers import (
+    ChangePasswordSerializer,
     InitialVoteSerializer,
     MatchPlayerSerializer,
     MatchSerializer,
@@ -15,6 +17,7 @@ from .serializers import (
     PlayerProfileSerializer,
     UserRegisterSerializer,
     UserSerializer,
+    UserUpdateSerializer,
 )
 
 User = get_user_model()
@@ -34,6 +37,23 @@ class CurrentUserView(APIView):
 
     def get(self, request):
         return Response(UserSerializer(request.user).data)
+
+    def patch(self, request):
+        serializer = UserUpdateSerializer(request.user, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(UserSerializer(request.user).data)
+
+
+class ChangePasswordView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        serializer = ChangePasswordSerializer(data=request.data, context={"request": request})
+        serializer.is_valid(raise_exception=True)
+        request.user.set_password(serializer.validated_data["new_password"])
+        request.user.save()
+        return Response({"detail": "Contraseña actualizada correctamente."})
 
 
 class RegisterView(APIView):
@@ -100,6 +120,8 @@ class InitialVoteViewSet(viewsets.ModelViewSet):
     queryset = InitialVote.objects.all()
     serializer_class = InitialVoteSerializer
     permission_classes = [permissions.IsAuthenticated]
+    # Un voto de calibración no se puede editar ni borrar una vez emitido.
+    http_method_names = ["get", "post", "head", "options"]
 
     def get_queryset(self):
         qs = super().get_queryset()
@@ -164,11 +186,55 @@ class MatchViewSet(viewsets.ModelViewSet):
         entries = MatchPlayer.objects.filter(match_id=pk, is_totw=True).order_by("totw_rank")
         return Response(MatchPlayerSerializer(entries, many=True).data)
 
+    @action(detail=True, methods=["post"], permission_classes=[permissions.IsAuthenticated])
+    def vote(self, request, pk=None):
+        """
+        Un jugador emite su Top 5 de la jornada en una sola petición atómica.
+        Body: {"votes": [{"voted_player": id, "points": 1-5}, ...]} (1 a 5 entradas).
+        Evita el 500 por IntegrityError que daba el POST directo a /match-votes/
+        cuando el mismo usuario intentaba votar dos veces en el mismo partido.
+        """
+        match = self.get_object()
+        if not match.is_finished:
+            return Response(
+                {"detail": "El partido todavía no ha finalizado."}, status=status.HTTP_400_BAD_REQUEST
+            )
+        if MatchVote.objects.filter(match=match, voter=request.user).exists():
+            return Response(
+                {"detail": "Ya has votado en este partido. Los votos no se pueden editar."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        entries = request.data.get("votes", [])
+        if not entries or len(entries) > 5:
+            return Response(
+                {"detail": "Debes elegir entre 1 y 5 jugadores."}, status=status.HTTP_400_BAD_REQUEST
+            )
+        player_ids = [e.get("voted_player") for e in entries]
+        points_list = [e.get("points") for e in entries]
+        if len(set(player_ids)) != len(player_ids):
+            return Response({"detail": "No puedes repetir jugador."}, status=status.HTTP_400_BAD_REQUEST)
+        if len(set(points_list)) != len(points_list) or any(
+            p not in (1, 2, 3, 4, 5) for p in points_list
+        ):
+            return Response({"detail": "Puntos de voto inválidos."}, status=status.HTTP_400_BAD_REQUEST)
+
+        created = []
+        with transaction.atomic():
+            for entry in entries:
+                serializer = MatchVoteSerializer(
+                    data={"match": match.id, **entry}, context={"request": request}
+                )
+                serializer.is_valid(raise_exception=True)
+                created.append(serializer.save(voter=request.user))
+        return Response(MatchVoteSerializer(created, many=True).data, status=status.HTTP_201_CREATED)
+
 
 class MatchVoteViewSet(viewsets.ModelViewSet):
     queryset = MatchVote.objects.all()
     serializer_class = MatchVoteSerializer
     permission_classes = [permissions.IsAuthenticated]
+    http_method_names = ["get", "head", "options"]
 
     def get_queryset(self):
         qs = super().get_queryset()
@@ -176,6 +242,3 @@ class MatchVoteViewSet(viewsets.ModelViewSet):
         if match:
             qs = qs.filter(match_id=match)
         return qs
-
-    def perform_create(self, serializer):
-        serializer.save(voter=self.request.user)

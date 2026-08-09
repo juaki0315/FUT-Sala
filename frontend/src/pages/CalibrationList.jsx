@@ -68,12 +68,18 @@ function AssignEvaluatorsPanel({ target, allPlayers, onSaved }) {
   );
 }
 
+// Un objetivo está "totalmente resuelto" (fuera de cualquier lista) solo cuando
+// ya está calibrado Y, si tiene evaluadores asignados, todos ellos han votado
+// ya. Así un evaluador rezagado puede seguir votando aunque el admin haya
+// pulsado "Calcular carta" con los votos que hubiera hasta ese momento.
+const isFullyResolved = (p) =>
+  p.calibrated && (p.assigned_voters_count === 0 || p.initial_votes_count >= p.assigned_voters_count);
+
 export default function CalibrationList() {
   const navigate = useNavigate();
   const { user, profile } = useAuth();
   const [pending, setPending] = useState([]);
   const [allPlayers, setAllPlayers] = useState([]);
-  const [votedTargets, setVotedTargets] = useState(new Set());
   const [loading, setLoading] = useState(true);
   const [calculating, setCalculating] = useState(null);
 
@@ -82,22 +88,20 @@ export default function CalibrationList() {
   const load = async () => {
     const res = await api.listPlayers();
     setAllPlayers(res.data);
-    const uncalibrated = res.data.filter((p) => !p.calibrated && p.id !== profile?.id);
-    // El admin gestiona todas las cartas pendientes; un jugador normal solo ve
-    // aquellas para las que el admin lo asignó explícitamente como evaluador.
-    const targets = isAdmin
-      ? uncalibrated
-      : uncalibrated.filter((p) => p.assigned_voter_ids.includes(user?.id));
-    setPending(targets);
+    const notMe = res.data.filter((p) => p.id !== profile?.id && !isFullyResolved(p));
 
-    const votes = await Promise.all(targets.map((t) => api.listInitialVotes(t.id)));
-    const voted = new Set();
-    votes.forEach((res, i) => {
-      if (res.data.some((v) => v.voter === user?.id)) {
-        voted.add(targets[i].id);
-      }
-    });
-    setVotedTargets(voted);
+    if (isAdmin) {
+      // El admin gestiona todo lo que quede por resolver, esté o no calibrado.
+      setPending(notMe);
+      return;
+    }
+
+    // Un jugador normal solo ve lo que el admin le asignó explícitamente
+    // valorar, y solo mientras no lo haya votado ya (el voto es inmutable).
+    const assignedToMe = notMe.filter((p) => p.assigned_voter_ids.includes(user?.id));
+    const votes = await Promise.all(assignedToMe.map((t) => api.listInitialVotes(t.id)));
+    const notVotedYet = assignedToMe.filter((_, i) => !votes[i].data.some((v) => v.voter === user?.id));
+    setPending(notVotedYet);
   };
 
   useEffect(() => {
@@ -143,7 +147,6 @@ export default function CalibrationList() {
           </div>
         ) : (
           pending.map((p) => {
-            const hasVoted = votedTargets.has(p.id);
             const totalExpected = p.assigned_voters_count > 0 ? p.assigned_voters_count : null;
             return (
               <div key={p.id} className="rounded-2xl bg-pitch-850 border border-pitch-700 p-4">
@@ -176,8 +179,7 @@ export default function CalibrationList() {
                       to={`/calibracion/${p.id}`}
                       className="rounded-lg bg-gold-500 px-3 py-1.5 text-xs font-semibold text-pitch-900 text-center flex items-center gap-1 justify-center"
                     >
-                      <ClipboardCheck size={13} />
-                      {hasVoted ? "Editar voto" : "Votar"}
+                      <ClipboardCheck size={13} /> Votar
                     </Link>
                     {isAdmin && p.initial_votes_count > 0 && (
                       <button

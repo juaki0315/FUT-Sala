@@ -15,6 +15,30 @@ class UserSerializer(serializers.ModelSerializer):
         fields = ["id", "username", "email", "is_staff"]
 
 
+class UserUpdateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = ["username", "email"]
+        extra_kwargs = {"email": {"required": False}}
+
+    def validate_username(self, value):
+        qs = User.objects.filter(username=value).exclude(pk=self.instance.pk)
+        if qs.exists():
+            raise serializers.ValidationError("Ese nombre de usuario ya está en uso.")
+        return value
+
+
+class ChangePasswordSerializer(serializers.Serializer):
+    current_password = serializers.CharField(write_only=True)
+    new_password = serializers.CharField(write_only=True, min_length=6)
+
+    def validate_current_password(self, value):
+        user = self.context["request"].user
+        if not user.check_password(value):
+            raise serializers.ValidationError("La contraseña actual no es correcta.")
+        return value
+
+
 class UserRegisterSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, min_length=6)
 
@@ -111,6 +135,12 @@ class InitialVoteSerializer(serializers.ModelSerializer):
             if assigned_ids and request.user.id not in assigned_ids:
                 raise serializers.ValidationError(
                     "No estás asignado como evaluador de este jugador."
+                )
+            if not self.instance and InitialVote.objects.filter(
+                voter=request.user, target=target
+            ).exists():
+                raise serializers.ValidationError(
+                    "Ya has votado a este jugador. Los votos no se pueden editar."
                 )
         return attrs
 

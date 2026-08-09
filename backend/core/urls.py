@@ -12,5 +12,6 @@ router.register("match-votes", views.MatchVoteViewSet, basename="match-vote")
 urlpatterns = [
     path("register/", views.RegisterView.as_view(), name="register"),
     path("auth/me/", views.CurrentUserView.as_view(), name="current-user"),
+    path("auth/change-password/", views.ChangePasswordView.as_view(), name="change-password"),
     path("", include(router.urls)),
 ]

@@ -20,6 +20,9 @@ export default function MatchDetail() {
   const [selectedTop5, setSelectedTop5] = useState([]);
   const [totw, setTotw] = useState([]);
   const [msg, setMsg] = useState("");
+  const [error, setError] = useState("");
+  const [myVotes, setMyVotes] = useState(null);
+  const [votingSaving, setVotingSaving] = useState(false);
 
   const isAdmin = user?.is_staff;
 
@@ -30,6 +33,9 @@ export default function MatchDetail() {
     if (mRes.data.is_finished) {
       const t = await api.currentTotw(id);
       setTotw(t.data);
+      const vRes = await api.listMatchVotes(id);
+      const mine = vRes.data.filter((v) => v.voter === user?.id);
+      setMyVotes(mine.length > 0 ? mine : null);
     }
   };
 
@@ -63,12 +69,21 @@ export default function MatchDetail() {
   };
 
   const submitVotes = async () => {
-    const points = [5, 4, 3, 2, 1];
-    for (let i = 0; i < selectedTop5.length; i++) {
-      await api.castMatchVote({ match: Number(id), voted_player: selectedTop5[i], points: points[i] });
+    setError("");
+    setVotingSaving(true);
+    try {
+      const points = [5, 4, 3, 2, 1];
+      const votes = selectedTop5.map((playerId, i) => ({ voted_player: playerId, points: points[i] }));
+      const res = await api.submitMatchVotes(id, votes);
+      setMyVotes(res.data);
+      setMsg("¡Voto registrado!");
+      setSelectedTop5([]);
+    } catch (err) {
+      const detail = err.response?.data?.detail;
+      setError(detail || err.friendlyMessage || "No se pudo registrar el voto.");
+    } finally {
+      setVotingSaving(false);
     }
-    setMsg("¡Voto registrado!");
-    setSelectedTop5([]);
   };
 
   const runTotw = async () => {
@@ -215,34 +230,63 @@ export default function MatchDetail() {
             <h2 className="text-xs font-semibold uppercase tracking-widest text-floodlight-300/50 mb-3 flex items-center gap-1.5">
               <Vote size={13} /> Vota tu Top 5 de la jornada
             </h2>
-            <div className="space-y-1.5">
-              {match.participants.map((mp) => {
-                const rank = selectedTop5.indexOf(mp.player);
-                return (
-                  <button
-                    key={mp.id}
-                    onClick={() => toggleTop5(mp.player)}
-                    className={`w-full flex items-center justify-between rounded-xl border px-3.5 py-2.5 text-sm transition-colors ${
-                      rank >= 0
-                        ? "border-gold-500 bg-gold-500/10 text-gold-300"
-                        : "border-pitch-700 bg-pitch-850 text-floodlight-300"
-                    }`}
-                  >
-                    <span>{mp.player_detail?.username}</span>
-                    {rank >= 0 && (
-                      <span className="font-display text-lg">{[5, 4, 3, 2, 1][rank]} pts</span>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-            <button
-              onClick={submitVotes}
-              disabled={selectedTop5.length === 0}
-              className="mt-3 w-full rounded-xl bg-gold-500 py-3 text-sm font-semibold text-pitch-900 disabled:opacity-40"
-            >
-              Enviar voto ({selectedTop5.length}/5)
-            </button>
+
+            {error && (
+              <div className="mb-2 rounded-lg bg-red-500/10 border border-red-500/30 px-3 py-2 text-xs text-red-300">
+                {error}
+              </div>
+            )}
+
+            {myVotes ? (
+              <div className="rounded-xl bg-pitch-850 border border-pitch-700 p-3 space-y-1.5">
+                <div className="text-xs text-floodlight-300/50 mb-1">
+                  Ya has votado en este partido. Los votos no se pueden editar.
+                </div>
+                {myVotes
+                  .slice()
+                  .sort((a, b) => b.points - a.points)
+                  .map((v) => {
+                    const mp = match.participants.find((p) => p.player === v.voted_player);
+                    return (
+                      <div key={v.id} className="flex items-center justify-between text-sm text-floodlight-300">
+                        <span>{mp?.player_detail?.username ?? "?"}</span>
+                        <span className="font-display text-base text-gold-400">{v.points} pts</span>
+                      </div>
+                    );
+                  })}
+              </div>
+            ) : (
+              <>
+                <div className="space-y-1.5">
+                  {match.participants.map((mp) => {
+                    const rank = selectedTop5.indexOf(mp.player);
+                    return (
+                      <button
+                        key={mp.id}
+                        onClick={() => toggleTop5(mp.player)}
+                        className={`w-full flex items-center justify-between rounded-xl border px-3.5 py-2.5 text-sm transition-colors ${
+                          rank >= 0
+                            ? "border-gold-500 bg-gold-500/10 text-gold-300"
+                            : "border-pitch-700 bg-pitch-850 text-floodlight-300"
+                        }`}
+                      >
+                        <span>{mp.player_detail?.username}</span>
+                        {rank >= 0 && (
+                          <span className="font-display text-lg">{[5, 4, 3, 2, 1][rank]} pts</span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+                <button
+                  onClick={submitVotes}
+                  disabled={selectedTop5.length === 0 || votingSaving}
+                  className="mt-3 w-full rounded-xl bg-gold-500 py-3 text-sm font-semibold text-pitch-900 disabled:opacity-40"
+                >
+                  {votingSaving ? "Enviando..." : `Enviar voto (${selectedTop5.length}/5)`}
+                </button>
+              </>
+            )}
 
             {isAdmin && (
               <button

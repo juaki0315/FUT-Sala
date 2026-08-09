@@ -13,16 +13,34 @@ client.interceptors.request.use((config) => {
 
 let refreshing = null;
 
+// Endpoints públicos: un 401 aquí es "credenciales incorrectas", NO una sesión
+// expirada, así que nunca deben disparar el flujo de refresh/logout global.
+const PUBLIC_ENDPOINTS = ["/auth/token/", "/register/"];
+const isPublicEndpoint = (url) => PUBLIC_ENDPOINTS.some((p) => url?.startsWith(p));
+
+function forceLogout() {
+  localStorage.removeItem("fs_access");
+  localStorage.removeItem("fs_refresh");
+  // Aviso a AuthContext (si está montado) para que limpie su estado sin
+  // recargar toda la página; si no hay nadie escuchando, el fallback de abajo
+  // sigue funcionando gracias al rewrite SPA configurado en Vercel.
+  window.dispatchEvent(new CustomEvent("auth:logout"));
+}
+
 client.interceptors.response.use(
   (res) => res,
   async (error) => {
     const original = error.config;
-    if (error.response?.status === 401 && !original._retry) {
+    if (!error.response) {
+      // Sin respuesta del servidor: red caída, CORS, o backend dormido/caído.
+      error.friendlyMessage = "No se pudo conectar con el servidor. Inténtalo de nuevo en unos segundos.";
+      return Promise.reject(error);
+    }
+    if (error.response.status === 401 && !isPublicEndpoint(original.url) && !original._retry) {
       original._retry = true;
       const refresh = localStorage.getItem("fs_refresh");
       if (!refresh) {
-        localStorage.removeItem("fs_access");
-        window.location.href = "/login";
+        forceLogout();
         return Promise.reject(error);
       }
       try {
@@ -41,9 +59,7 @@ client.interceptors.response.use(
         original.headers.Authorization = `Bearer ${newAccess}`;
         return client(original);
       } catch {
-        localStorage.removeItem("fs_access");
-        localStorage.removeItem("fs_refresh");
-        window.location.href = "/login";
+        forceLogout();
         return Promise.reject(error);
       }
     }

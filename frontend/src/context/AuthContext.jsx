@@ -49,6 +49,18 @@ export function AuthProvider({ children }) {
     }
   }, []);
 
+  useEffect(() => {
+    // Disparado por client.js cuando el refresh token también expiró/falló:
+    // limpiamos sesión sin recargar la página (evita el flash de un 404 en
+    // hostings estáticos y mantiene la app como SPA).
+    const onForcedLogout = () => {
+      setUser(null);
+      setProfile(null);
+    };
+    window.addEventListener("auth:logout", onForcedLogout);
+    return () => window.removeEventListener("auth:logout", onForcedLogout);
+  }, []);
+
   const login = async (username, password) => {
     const res = await client.post("/auth/token/", { username, password });
     localStorage.setItem("fs_access", res.data.access);
@@ -72,6 +84,7 @@ export function AuthProvider({ children }) {
     <AuthContext.Provider
       value={{
         user,
+        setUser,
         profile,
         setProfile,
         loading,

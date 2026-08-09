@@ -1,7 +1,7 @@
 import { useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Image as ImageIcon, LogOut, Upload } from "lucide-react";
+import { Image as ImageIcon, LogOut, Settings, Upload } from "lucide-react";
 import Layout from "../components/Layout";
 import PageHeader from "../components/PageHeader";
 import PlayerCard from "../components/PlayerCard";
@@ -33,12 +33,20 @@ export default function MyCard() {
           <p className="text-sm text-floodlight-300/50">
             Los administradores no tienen carta de jugador.
           </p>
-          <button
-            onClick={handleLogout}
-            className="flex items-center justify-center gap-2 rounded-xl border border-pitch-700 px-6 py-3 text-sm font-semibold text-floodlight-300/60 hover:text-red-400 hover:border-red-500/40 transition-colors"
-          >
-            <LogOut size={16} /> Cerrar sesión
-          </button>
+          <div className="w-full max-w-xs flex flex-col gap-2">
+            <Link
+              to="/cuenta"
+              className="flex items-center justify-center gap-2 rounded-xl border border-pitch-700 px-6 py-3 text-sm font-semibold text-floodlight-300/60 hover:text-gold-400 hover:border-gold-500/40 transition-colors"
+            >
+              <Settings size={16} /> Ajustes de cuenta
+            </Link>
+            <button
+              onClick={handleLogout}
+              className="flex items-center justify-center gap-2 rounded-xl border border-pitch-700 px-6 py-3 text-sm font-semibold text-floodlight-300/60 hover:text-red-400 hover:border-red-500/40 transition-colors"
+            >
+              <LogOut size={16} /> Cerrar sesión
+            </button>
+          </div>
         </div>
       </Layout>
     );
@@ -144,9 +152,15 @@ export default function MyCard() {
           </div>
         </motion.section>
 
+        <Link
+          to="/cuenta"
+          className="w-full mt-8 flex items-center justify-center gap-2 rounded-xl border border-pitch-700 py-3 text-sm font-semibold text-floodlight-300/60 hover:text-gold-400 hover:border-gold-500/40 transition-colors"
+        >
+          <Settings size={16} /> Ajustes de cuenta
+        </Link>
         <button
           onClick={handleLogout}
-          className="w-full mt-8 flex items-center justify-center gap-2 rounded-xl border border-pitch-700 py-3 text-sm font-semibold text-floodlight-300/60 hover:text-red-400 hover:border-red-500/40 transition-colors"
+          className="w-full mt-3 flex items-center justify-center gap-2 rounded-xl border border-pitch-700 py-3 text-sm font-semibold text-floodlight-300/60 hover:text-red-400 hover:border-red-500/40 transition-colors"
         >
           <LogOut size={16} /> Cerrar sesión
         </button>

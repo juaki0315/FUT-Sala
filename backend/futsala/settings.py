@@ -35,6 +35,14 @@ ALLOWED_HOSTS = [
     h.strip() for h in os.environ.get('DJANGO_ALLOWED_HOSTS', '').split(',') if h.strip()
 ]
 
+# PythonAnywhere (y la mayoría de PaaS) terminan el HTTPS en un proxy y reenvían
+# la petición a Django por HTTP simple, añadiendo esta cabecera para indicar el
+# protocolo original. Sin esto, request.is_secure() da False y las URLs
+# absolutas que genera DRF (p.ej. la de las fotos subidas) salen como
+# "http://..." en vez de "https://...", lo que el navegador bloquea como
+# contenido mixto en una página https:// (se ve como imagen rota/interrogación).
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+
 
 # Application definition
 

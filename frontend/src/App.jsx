@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "./context/AuthContext";
+import ErrorBoundary from "./components/ErrorBoundary";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import HomePage from "./pages/HomePage";
@@ -9,6 +10,7 @@ import MatchDetail from "./pages/MatchDetail";
 import Totw from "./pages/Totw";
 import CalibrationList from "./pages/CalibrationList";
 import CalibrateForm from "./pages/CalibrateForm";
+import AccountSettings from "./pages/AccountSettings";
 
 function PrivateRoute({ children }) {
   const { user, ready } = useAuth();
@@ -84,6 +86,14 @@ function AppRoutes() {
           </PrivateRoute>
         }
       />
+      <Route
+        path="/cuenta"
+        element={
+          <PrivateRoute>
+            <AccountSettings />
+          </PrivateRoute>
+        }
+      />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
@@ -91,10 +101,12 @@ function AppRoutes() {
 
 export default function App() {
   return (
-    <AuthProvider>
-      <BrowserRouter>
-        <AppRoutes />
-      </BrowserRouter>
-    </AuthProvider>
+    <ErrorBoundary>
+      <AuthProvider>
+        <BrowserRouter>
+          <AppRoutes />
+        </BrowserRouter>
+      </AuthProvider>
+    </ErrorBoundary>
   );
 }

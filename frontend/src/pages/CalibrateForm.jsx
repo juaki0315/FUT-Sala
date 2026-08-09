@@ -43,10 +43,10 @@ function StarPicker({ value, onChange }) {
 export default function CalibrateForm() {
   const { targetId } = useParams();
   const navigate = useNavigate();
-  const { profile } = useAuth();
+  const { user } = useAuth();
   const [target, setTarget] = useState(null);
   const [vote, setVote] = useState(DEFAULT_VOTE);
-  const [existingVoteId, setExistingVoteId] = useState(null);
+  const [alreadyVoted, setAlreadyVoted] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -59,16 +59,7 @@ export default function CalibrateForm() {
         api.listInitialVotes(targetId),
       ]);
       setTarget(tRes.data);
-
-      const mine = vRes.data.find((v) => v.voter === profile?.user?.id);
-      if (mine) {
-        setExistingVoteId(mine.id);
-        setVote({
-          ritmo: mine.ritmo, tiro: mine.tiro, pase: mine.pase, regate: mine.regate,
-          defensa: mine.defensa, fisico: mine.fisico,
-          pierna_mala: mine.pierna_mala, filigranas: mine.filigranas,
-        });
-      }
+      setAlreadyVoted(vRes.data.some((v) => v.voter === user?.id));
       setLoading(false);
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -88,18 +79,14 @@ export default function CalibrateForm() {
     setSaving(true);
     setError("");
     try {
-      const payload = { target: Number(targetId), ...vote };
-      if (existingVoteId) {
-        await api.updateInitialVote(existingVoteId, payload);
-      } else {
-        await api.castInitialVote(payload);
-      }
+      await api.castInitialVote({ target: Number(targetId), ...vote });
       setSaved(true);
       setTimeout(() => navigate("/calibracion"), 900);
     } catch (err) {
       const detail = err.response?.data;
       const msg =
         (typeof detail === "object" && detail && Object.values(detail)[0]) ||
+        err.friendlyMessage ||
         "No se pudo guardar el voto.";
       setError(Array.isArray(msg) ? msg[0] : String(msg));
     } finally {
@@ -126,7 +113,7 @@ export default function CalibrateForm() {
         </button>
         <div>
           <div className="text-[11px] uppercase tracking-widest text-floodlight-500/70 font-semibold">
-            {existingVoteId ? "Editar voto" : "Nuevo voto"}
+            Nuevo voto
           </div>
           <h1 className="font-display text-2xl text-floodlight-300 leading-none">{target.username}</h1>
         </div>
@@ -137,55 +124,63 @@ export default function CalibrateForm() {
           <PlayerCard player={previewPlayer} size="md" animated={false} />
         </div>
 
-        {saved && (
-          <div className="rounded-lg bg-floodlight-500/10 border border-floodlight-500/30 px-3 py-2 text-xs text-floodlight-300/80 flex items-center gap-1.5">
-            <Check size={14} className="text-gold-400" /> Voto guardado.
+        {alreadyVoted ? (
+          <div className="rounded-lg bg-floodlight-500/10 border border-floodlight-500/30 px-4 py-3 text-sm text-floodlight-300/80 text-center">
+            Ya has votado a este jugador. Los votos no se pueden editar.
           </div>
-        )}
-
-        {error && (
-          <div className="rounded-lg bg-red-500/10 border border-red-500/30 px-3 py-2 text-xs text-red-300">
-            {error}
-          </div>
-        )}
-
-        <section className="space-y-4">
-          {ATTRS.map(({ key, label, icon: Icon }) => (
-            <div key={key}>
-              <div className="flex items-center justify-between mb-1.5">
-                <span className="flex items-center gap-1.5 text-sm text-floodlight-300/70">
-                  <Icon size={14} /> {label}
-                </span>
-                <span className="font-display text-lg text-gold-400">{vote[key]}</span>
+        ) : (
+          <>
+            {saved && (
+              <div className="rounded-lg bg-floodlight-500/10 border border-floodlight-500/30 px-3 py-2 text-xs text-floodlight-300/80 flex items-center gap-1.5">
+                <Check size={14} className="text-gold-400" /> Voto guardado.
               </div>
-              <input
-                type="range"
-                min={1}
-                max={99}
-                value={vote[key]}
-                onChange={(e) => setAttr(key, Number(e.target.value))}
-                className="w-full accent-gold-500"
-              />
-            </div>
-          ))}
-        </section>
+            )}
 
-        <section className="space-y-3">
-          {STAR_ATTRS.map(({ key, label }) => (
-            <div key={key} className="flex items-center justify-between">
-              <span className="text-sm text-floodlight-300/70">{label}</span>
-              <StarPicker value={vote[key]} onChange={(v) => setAttr(key, v)} />
-            </div>
-          ))}
-        </section>
+            {error && (
+              <div className="rounded-lg bg-red-500/10 border border-red-500/30 px-3 py-2 text-xs text-red-300">
+                {error}
+              </div>
+            )}
 
-        <button
-          onClick={submit}
-          disabled={saving}
-          className="w-full rounded-xl bg-gold-500 py-3 text-sm font-semibold text-pitch-900 disabled:opacity-60"
-        >
-          {saving ? "Guardando..." : existingVoteId ? "Actualizar voto" : "Enviar voto"}
-        </button>
+            <section className="space-y-4">
+              {ATTRS.map(({ key, label, icon: Icon }) => (
+                <div key={key}>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="flex items-center gap-1.5 text-sm text-floodlight-300/70">
+                      <Icon size={14} /> {label}
+                    </span>
+                    <span className="font-display text-lg text-gold-400">{vote[key]}</span>
+                  </div>
+                  <input
+                    type="range"
+                    min={1}
+                    max={99}
+                    value={vote[key]}
+                    onChange={(e) => setAttr(key, Number(e.target.value))}
+                    className="w-full accent-gold-500"
+                  />
+                </div>
+              ))}
+            </section>
+
+            <section className="space-y-3">
+              {STAR_ATTRS.map(({ key, label }) => (
+                <div key={key} className="flex items-center justify-between">
+                  <span className="text-sm text-floodlight-300/70">{label}</span>
+                  <StarPicker value={vote[key]} onChange={(v) => setAttr(key, v)} />
+                </div>
+              ))}
+            </section>
+
+            <button
+              onClick={submit}
+              disabled={saving}
+              className="w-full rounded-xl bg-gold-500 py-3 text-sm font-semibold text-pitch-900 disabled:opacity-60"
+            >
+              {saving ? "Guardando..." : "Enviar voto"}
+            </button>
+          </>
+        )}
       </div>
     </Layout>
   );

@@ -21,10 +21,9 @@ export const api = {
   calibratePlayer: (id) => client.post(`/players/${id}/calibrate/`),
   assignEvaluators: (id, voterIds) => client.post(`/players/${id}/assign_evaluators/`, { voter_ids: voterIds }),
 
-  // Valoración inicial
+  // Valoración inicial (inmutable: un voto no se puede editar una vez emitido)
   listInitialVotes: (targetId) => client.get(`/initial-votes/?target=${targetId}`),
   castInitialVote: (payload) => client.post("/initial-votes/", payload),
-  updateInitialVote: (voteId, payload) => client.put(`/initial-votes/${voteId}/`, payload),
 
   // Partidos
   listMatches: () => client.get("/matches/"),
@@ -35,7 +34,11 @@ export const api = {
   generateTotw: (id) => client.post(`/matches/${id}/generate_totw/`),
   currentTotw: (id) => client.get(`/matches/${id}/current_totw/`),
 
-  // Votación post-partido
-  castMatchVote: (payload) => client.post("/match-votes/", payload),
+  // Votación post-partido (inmutable: se manda el Top 5 completo en una sola petición)
+  submitMatchVotes: (matchId, votes) => client.post(`/matches/${matchId}/vote/`, { votes }),
   listMatchVotes: (matchId) => client.get(`/match-votes/?match=${matchId}`),
+
+  // Cuenta
+  updateAccount: (payload) => client.patch("/auth/me/", payload),
+  changePassword: (payload) => client.post("/auth/change-password/", payload),
 };
