@@ -1,0 +1,13 @@
+{
+  "name": "FUT-Sala Tracker",
+  "short_name": "FUT-Sala",
+  "description": "Cartas FIFA para tus partidos semanales de fútbol sala",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0D1310",
+  "theme_color": "#0D1310",
+  "orientation": "portrait",
+  "icons": [
+    { "src": "/ball.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}

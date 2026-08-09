@@ -1,0 +1,85 @@
+@import "tailwindcss";
+
+@theme {
+  /* Paleta: pista de futsal bajo focos nocturnos */
+  --color-pitch-950: #0a0f0d;
+  --color-pitch-900: #0d1310;
+  --color-pitch-850: #121c17;
+  --color-pitch-800: #172420;
+  --color-pitch-700: #24352e;
+  --color-pitch-600: #3a4f45;
+
+  --color-gold-300: #fce49c;
+  --color-gold-400: #f0cd6a;
+  --color-gold-500: #e8b93e;
+  --color-gold-600: #c9962a;
+
+  --color-floodlight-300: #d7f3ff;
+  --color-floodlight-400: #a9e6ff;
+  --color-floodlight-500: #6fd3f5;
+
+  --color-totw-purple: #3b0764;
+  --color-totw-magenta: #7c1d6f;
+
+  --font-display: "Teko", "Inter", sans-serif;
+  --font-body: "Inter", system-ui, sans-serif;
+}
+
+html, body, #root {
+  height: 100%;
+}
+
+body {
+  background-color: var(--color-pitch-950);
+  color: var(--color-floodlight-300);
+  font-family: var(--font-body);
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior-y: none;
+}
+
+/* Textura sutil de césped/turf en el fondo */
+.pitch-texture {
+  background-image:
+    radial-gradient(circle at 20% 10%, rgba(111, 211, 245, 0.08), transparent 40%),
+    repeating-linear-gradient(
+      0deg,
+      rgba(255, 255, 255, 0.015) 0px,
+      rgba(255, 255, 255, 0.015) 1px,
+      transparent 1px,
+      transparent 22px
+    );
+}
+
+.font-display {
+  font-family: var(--font-display);
+  letter-spacing: 0.01em;
+}
+
+/* Barrido de brillo (foil) para las cartas, señal visual de "carta especial" */
+@keyframes card-sheen {
+  0% { transform: translateX(-120%) rotate(20deg); }
+  100% { transform: translateX(220%) rotate(20deg); }
+}
+.card-sheen::after {
+  content: "";
+  position: absolute;
+  top: -20%;
+  left: 0;
+  width: 40%;
+  height: 140%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.35),
+    transparent
+  );
+  animation: card-sheen 2.6s ease-in-out infinite;
+  animation-delay: 0.4s;
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card-sheen::after { animation: none; }
+}
+
+::-webkit-scrollbar { width: 0; height: 0; }
