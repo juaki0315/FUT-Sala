@@ -1,9 +1,8 @@
 import { useEffect, useState } from "react";
-import { motion } from "framer-motion";
 import { Trophy } from "lucide-react";
 import Layout from "../components/Layout";
 import PageHeader from "../components/PageHeader";
-import PlayerCard from "../components/PlayerCard";
+import TotwPitch from "../components/TotwPitch";
 import { api } from "../api/endpoints";
 
 export default function Totw() {
@@ -51,22 +50,7 @@ export default function Totw() {
             </p>
           </div>
         ) : (
-          <div className="grid grid-cols-2 gap-x-3 gap-y-6 justify-items-center">
-            {totw.map((mp, i) => (
-              <motion.div
-                key={mp.id}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: i * 0.1, duration: 0.4 }}
-                className="flex flex-col items-center gap-2"
-              >
-                <div className="text-[11px] font-semibold text-gold-400 font-display text-base">
-                  #{mp.totw_rank} {mp.totw_rank === 1 ? "· MVP" : ""}
-                </div>
-                <PlayerCard player={mp.player_detail} size="sm" />
-              </motion.div>
-            ))}
-          </div>
+          <TotwPitch entries={totw} />
         )}
       </div>
     </Layout>
