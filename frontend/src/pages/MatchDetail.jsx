@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, Users, Trophy, Vote, Flag } from "lucide-react";
+import { ArrowLeft, Users, Trophy, Vote, Flag, BarChart3 } from "lucide-react";
 import Layout from "../components/Layout";
 import PitchLineup from "../components/PitchLineup";
 import { api } from "../api/endpoints";
@@ -21,6 +21,7 @@ export default function MatchDetail() {
   const [msg, setMsg] = useState("");
   const [error, setError] = useState("");
   const [myVotes, setMyVotes] = useState(null);
+  const [allVotes, setAllVotes] = useState([]);
   const [votingSaving, setVotingSaving] = useState(false);
 
   const isAdmin = user?.is_staff;
@@ -35,6 +36,7 @@ export default function MatchDetail() {
       const vRes = await api.listMatchVotes(id);
       const mine = vRes.data.filter((v) => v.voter === user?.id);
       setMyVotes(mine.length > 0 ? mine : null);
+      setAllVotes(vRes.data);
     }
   };
 
@@ -83,8 +85,12 @@ export default function MatchDetail() {
       setMsg("¡Voto registrado!");
       setSelectedTop5([]);
     } catch (err) {
-      const detail = err.response?.data?.detail;
-      setError(detail || err.friendlyMessage || "No se pudo registrar el voto.");
+      const data = err.response?.data;
+      const msg =
+        data?.detail ||
+        (typeof data === "object" && data && Object.values(data)[0]) ||
+        err.friendlyMessage;
+      setError(Array.isArray(msg) ? msg[0] : msg || "No se pudo registrar el voto.");
     } finally {
       setVotingSaving(false);
     }
@@ -114,6 +120,29 @@ export default function MatchDetail() {
 
   const teamA = match.participants.filter((p) => p.team === "A");
   const teamB = match.participants.filter((p) => p.team === "B");
+
+  const voteTally = (() => {
+    const tally = new Map();
+    for (const v of allVotes) {
+      const entry = tally.get(v.voted_player) || { points: 0, count: 0 };
+      entry.points += v.points;
+      entry.count += 1;
+      tally.set(v.voted_player, entry);
+    }
+    return Array.from(tally.entries())
+      .map(([playerId, { points, count }]) => ({
+        player: allPlayers.find((p) => p.id === playerId),
+        points,
+        count,
+      }))
+      .sort((a, b) => b.points - a.points);
+  })();
+  const distinctVoters = new Set(allVotes.map((v) => v.voter)).size;
+
+  // Nunca te puedes votar a ti mismo (el backend ya lo rechaza, pero si se
+  // cuela en el Top 5 elegido revienta el envío entero de las 5 elecciones
+  // a la vez). Más simple y robusto: quitarte directamente de la lista.
+  const voteCandidates = match.participants.filter((mp) => mp.player_detail?.user?.id !== user?.id);
 
   return (
     <Layout>
@@ -222,6 +251,47 @@ export default function MatchDetail() {
           </section>
         )}
 
+        {/* Estado de la votación (solo admin) */}
+        {isAdmin && match.is_finished && (
+          <section>
+            <h2 className="text-xs font-semibold uppercase tracking-widest text-floodlight-300/50 mb-3 flex items-center gap-1.5">
+              <BarChart3 size={13} /> Estado de la votación
+            </h2>
+            <div className="rounded-xl bg-pitch-850 border border-pitch-700 p-3">
+              <div className="text-xs text-floodlight-300/50 mb-2">
+                {distinctVoters} persona{distinctVoters === 1 ? "" : "s"} han votado ·{" "}
+                {allVotes.length} voto{allVotes.length === 1 ? "" : "s"} en total
+              </div>
+              {voteTally.length === 0 ? (
+                <div className="text-sm text-floodlight-300/40 py-2 text-center">
+                  Todavía nadie ha votado.
+                </div>
+              ) : (
+                <div className="space-y-1.5">
+                  {voteTally.map((entry, i) => (
+                    <div
+                      key={entry.player?.id ?? i}
+                      className={`flex items-center justify-between rounded-lg px-3 py-2 text-sm ${
+                        i < 5
+                          ? "bg-totw-purple/15 border border-totw-purple/30 text-gold-200"
+                          : "text-floodlight-300/70"
+                      }`}
+                    >
+                      <span className="flex items-center gap-2">
+                        {i < 5 && <Trophy size={12} className="text-gold-400 shrink-0" />}#{i + 1}{" "}
+                        {entry.player?.username ?? "Jugador eliminado"}
+                      </span>
+                      <span className="font-display text-base">
+                        {entry.points} pts <span className="text-xs opacity-60">({entry.count})</span>
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </section>
+        )}
+
         {/* Votación post-partido */}
         {match.is_finished && (
           <section>
@@ -250,7 +320,7 @@ export default function MatchDetail() {
             ) : (
               <>
                 <div className="space-y-1.5">
-                  {match.participants.map((mp) => {
+                  {voteCandidates.map((mp) => {
                     const rank = selectedTop5.indexOf(mp.player);
                     return (
                       <button

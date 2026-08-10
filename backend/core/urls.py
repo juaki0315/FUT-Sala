@@ -14,5 +14,6 @@ urlpatterns = [
     path("auth/me/", views.CurrentUserView.as_view(), name="current-user"),
     path("auth/change-password/", views.ChangePasswordView.as_view(), name="change-password"),
     path("admin/users-overview/", views.AdminUsersOverviewView.as_view(), name="admin-users-overview"),
+    path("admin/users/<int:pk>/", views.AdminUserDetailView.as_view(), name="admin-user-detail"),
     path("", include(router.urls)),
 ]

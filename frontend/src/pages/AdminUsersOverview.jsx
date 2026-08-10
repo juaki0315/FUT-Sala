@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Calendar, Clock, ShieldCheck, ClipboardCheck, Vote } from "lucide-react";
+import { ArrowLeft, Calendar, Clock, ShieldCheck, ClipboardCheck, Vote, Trash2 } from "lucide-react";
 import Layout from "../components/Layout";
 import { api } from "../api/endpoints";
 import { useAuth } from "../context/AuthContext";
@@ -40,6 +40,8 @@ export default function AdminUsersOverview() {
   const { user } = useAuth();
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [deletingId, setDeletingId] = useState(null);
+  const [error, setError] = useState("");
 
   useEffect(() => {
     if (!user?.is_staff) {
@@ -51,6 +53,26 @@ export default function AdminUsersOverview() {
       .then((res) => setUsers(res.data))
       .finally(() => setLoading(false));
   }, [user?.is_staff]);
+
+  const handleDelete = async (target) => {
+    const confirmed = window.confirm(
+      `¿Eliminar a "${target.username}" para siempre?\n\n` +
+        "Esto borra su carta, sus votos (emitidos y recibidos), su historial de partidos " +
+        "y su cuenta. No se puede deshacer."
+    );
+    if (!confirmed) return;
+
+    setError("");
+    setDeletingId(target.id);
+    try {
+      await api.deleteUser(target.id);
+      setUsers((prev) => prev.filter((u) => u.id !== target.id));
+    } catch (err) {
+      setError(err.response?.data?.detail || err.friendlyMessage || "No se pudo eliminar el usuario.");
+    } finally {
+      setDeletingId(null);
+    }
+  };
 
   if (!loading && !user?.is_staff) {
     return (
@@ -83,6 +105,12 @@ export default function AdminUsersOverview() {
       </div>
 
       <div className="px-5 py-5 space-y-3">
+        {error && (
+          <div className="rounded-lg bg-red-500/10 border border-red-500/30 px-3 py-2 text-xs text-red-300">
+            {error}
+          </div>
+        )}
+
         {loading ? (
           <div className="space-y-3">
             <div className="h-28 rounded-xl bg-pitch-850 animate-pulse" />
@@ -116,6 +144,16 @@ export default function AdminUsersOverview() {
                   <div className="font-display text-2xl text-gold-400 shrink-0">
                     {u.overall_rating}
                   </div>
+                )}
+                {!u.is_staff && (
+                  <button
+                    onClick={() => handleDelete(u)}
+                    disabled={deletingId === u.id}
+                    className="h-8 w-8 rounded-full flex items-center justify-center text-floodlight-300/40 hover:text-red-400 hover:bg-red-500/10 transition-colors disabled:opacity-40 shrink-0"
+                    title="Eliminar usuario"
+                  >
+                    <Trash2 size={15} />
+                  </button>
                 )}
               </div>
 

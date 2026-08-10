@@ -44,4 +44,5 @@ export const api = {
 
   // Panel de admin
   adminUsersOverview: () => client.get("/admin/users-overview/"),
+  deleteUser: (id) => client.delete(`/admin/users/${id}/`),
 };

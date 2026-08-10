@@ -3,6 +3,32 @@ import { Star, Zap, Target, Compass, Shield as ShieldIcon, Dumbbell, Sparkles } 
 
 const ATTR_ICONS = { RIT: Zap, TIR: Target, PAS: Compass, REG: Sparkles, DEF: ShieldIcon, FIS: Dumbbell };
 
+// Tramos de carta según el OVR base (no el boost temporal de TOTJ, que tiene
+// su propia estética morado+dorado por encima de cualquier tramo).
+function getTier(overall) {
+  if (overall >= 70) return "gold";
+  if (overall >= 58) return "silver";
+  return "bronze";
+}
+
+const TIER_ACCENT = {
+  bronze: "text-bronze-400",
+  silver: "text-silver-300",
+  gold: "text-gold-400",
+};
+
+const TIER_BORDER = {
+  bronze: "border-bronze-400/40",
+  silver: "border-silver-400/40",
+  gold: "border-gold-400/40",
+};
+
+const TIER_RING = {
+  bronze: "border-bronze-400",
+  silver: "border-silver-300",
+  gold: "border-gold-400",
+};
+
 function Stars({ count }) {
   return (
     <span className="inline-flex gap-0.5">
@@ -10,7 +36,7 @@ function Stars({ count }) {
         <Star
           key={i}
           size={11}
-          className={i < count ? "fill-pitch-900 text-pitch-900" : "text-pitch-900/25"}
+          className={i < count ? "fill-current" : "text-current opacity-20"}
         />
       ))}
     </span>
@@ -19,19 +45,29 @@ function Stars({ count }) {
 
 /**
  * PlayerCard — el elemento de identidad visual de la app.
- * variant: "gold" (base) | "totw" (Equipo de la Jornada, negro/morado/oro con brillo)
+ * Todas las cartas comparten el mismo cuerpo "carbón"; el único distintivo
+ * del tramo (bronce/plata/oro, según OVR) es el color del aro de la foto y
+ * de los números — nada de etiquetas de texto sobre la carta.
+ * La TOTJ (Equipo de la Jornada) es su propio nivel especial, temporal,
+ * por encima de cualquier tramo: morado+dorado con brillo.
  */
 export default function PlayerCard({ player, size = "md", animated = true }) {
   if (!player) return null;
 
   const isTotw = player.is_totw_active;
   const ovr = player.current_card_rating ?? player.overall_rating;
+  const tier = getTier(player.overall_rating);
 
   const dims = size === "sm" ? "w-36" : size === "lg" ? "w-64" : "w-48";
+  const avatarSize = size === "sm" ? "h-14 w-14" : size === "lg" ? "h-28 w-28" : "h-20 w-20";
+  const avatarText = size === "lg" ? "text-3xl" : size === "sm" ? "text-lg" : "text-2xl";
 
   const frame = isTotw
     ? "bg-gradient-to-b from-pitch-950 via-totw-purple to-gold-500 text-gold-300"
-    : "bg-gradient-to-b from-gold-300 via-gold-500 to-gold-600 text-pitch-900";
+    : `bg-gradient-to-b from-pitch-700 via-pitch-800 to-pitch-900 text-floodlight-300 border ${TIER_BORDER[tier]}`;
+
+  const accent = isTotw ? "text-gold-300" : TIER_ACCENT[tier];
+  const ringColor = isTotw ? "border-gold-300" : TIER_RING[tier];
 
   const Wrapper = animated ? motion.div : "div";
   const animProps = animated
@@ -50,26 +86,22 @@ export default function PlayerCard({ player, size = "md", animated = true }) {
         isTotw ? "card-sheen ring-1 ring-gold-400/60" : ""
       }`}
     >
-      {isTotw && (
-        <div className="absolute top-2 right-2 flex items-center gap-1 rounded-full bg-gold-500/90 px-2 py-0.5 text-[10px] font-bold text-pitch-900 font-display tracking-wide">
-          <Sparkles size={10} /> TOTJ
-        </div>
-      )}
-
-      {/* Cabecera: OVR + estrellas */}
-      <div className="flex items-start justify-between">
+      {/* Cabecera: OVR + estrellas + foto */}
+      <div className="flex items-center justify-between">
         <div className="text-left leading-none">
-          <div className="font-display text-4xl font-semibold">{ovr}</div>
+          <div className={`font-display text-4xl font-semibold ${accent}`}>{ovr}</div>
           <div className="mt-1 flex flex-col gap-0.5 text-[10px] font-semibold opacity-80">
             <Stars count={player.pierna_mala} />
             <Stars count={player.filigranas} />
           </div>
         </div>
-        <div className="h-14 w-14 rounded-full bg-black/15 overflow-hidden ring-2 ring-black/10 flex items-center justify-center">
+        <div
+          className={`${avatarSize} shrink-0 rounded-full bg-white/5 overflow-hidden flex items-center justify-center border-[3px] ${ringColor} shadow-lg shadow-black/40`}
+        >
           {player.photo_url ? (
             <img src={player.photo_url} alt={player.username} className="h-full w-full object-cover" />
           ) : (
-            <span className="font-display text-xl">{player.username?.[0]?.toUpperCase() ?? "?"}</span>
+            <span className={`font-display ${avatarText}`}>{player.username?.[0]?.toUpperCase() ?? "?"}</span>
           )}
         </div>
       </div>
@@ -92,7 +124,7 @@ export default function PlayerCard({ player, size = "md", animated = true }) {
           const Icon = ATTR_ICONS[label];
           return (
             <div key={label} className="flex items-center gap-1.5">
-              <span className="font-display text-base w-6 text-right">{val}</span>
+              <span className={`font-display text-base w-6 text-right ${accent}`}>{val}</span>
               <Icon size={11} className="opacity-60" />
               <span className="opacity-70 text-[10px]">{label}</span>
             </div>

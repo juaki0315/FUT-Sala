@@ -14,6 +14,12 @@
   --color-gold-500: #e8b93e;
   --color-gold-600: #c9962a;
 
+  /* Tramos de carta por OVR (bronce/plata se suman al oro de arriba) */
+  --color-bronze-300: #e0b48c;
+  --color-bronze-400: #c17f4a;
+  --color-silver-300: #eef1f3;
+  --color-silver-400: #c3ccd1;
+
   --color-floodlight-300: #d7f3ff;
   --color-floodlight-400: #a9e6ff;
   --color-floodlight-500: #6fd3f5;

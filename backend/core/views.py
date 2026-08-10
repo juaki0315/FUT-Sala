@@ -108,6 +108,27 @@ class AdminUsersOverviewView(APIView):
         return Response(data)
 
 
+class AdminUserDetailView(APIView):
+    """Admin: eliminar una cuenta de jugador (borra en cascada su carta, votos e historial)."""
+
+    permission_classes = [permissions.IsAdminUser]
+
+    def delete(self, request, pk):
+        user = get_object_or_404(User, pk=pk)
+        if user.id == request.user.id:
+            return Response(
+                {"detail": "No puedes eliminar tu propia cuenta."}, status=status.HTTP_400_BAD_REQUEST
+            )
+        if user.is_staff:
+            return Response(
+                {"detail": "No se puede eliminar a otro administrador desde aquí."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        username = user.username
+        user.delete()
+        return Response({"detail": f"Usuario {username} eliminado."})
+
+
 class RegisterView(APIView):
     permission_classes = [permissions.AllowAny]
 
