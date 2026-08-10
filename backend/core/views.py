@@ -228,7 +228,7 @@ class MatchViewSet(viewsets.ModelViewSet):
                 match=match, player_id=entry["player"], defaults={"team": entry["team"]}
             )
             created.append(mp)
-        return Response(MatchPlayerSerializer(created, many=True).data)
+        return Response(MatchPlayerSerializer(created, many=True, context={"request": request}).data)
 
     @action(detail=True, methods=["post"])
     def finish(self, request, pk=None):
@@ -246,7 +246,7 @@ class MatchViewSet(viewsets.ModelViewSet):
             services.apply_match_result_evolution(match)
         except ValueError as e:
             return Response({"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)
-        return Response(MatchSerializer(match).data)
+        return Response(MatchSerializer(match, context={"request": request}).data)
 
     @action(detail=True, methods=["post"])
     def generate_totw(self, request, pk=None):
@@ -256,12 +256,12 @@ class MatchViewSet(viewsets.ModelViewSet):
             updated = services.generate_totw(match)
         except ValueError as e:
             return Response({"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)
-        return Response(MatchPlayerSerializer(updated, many=True).data)
+        return Response(MatchPlayerSerializer(updated, many=True, context={"request": request}).data)
 
     @action(detail=True, methods=["get"])
     def current_totw(self, request, pk=None):
         entries = MatchPlayer.objects.filter(match_id=pk, is_totw=True).order_by("totw_rank")
-        return Response(MatchPlayerSerializer(entries, many=True).data)
+        return Response(MatchPlayerSerializer(entries, many=True, context={"request": request}).data)
 
     @action(detail=True, methods=["post"], permission_classes=[permissions.IsAuthenticated])
     def vote(self, request, pk=None):

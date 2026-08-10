@@ -40,7 +40,14 @@ export default function PlayerDetail() {
           <div className="h-80 w-56 rounded-2xl bg-pitch-850 animate-pulse" />
         ) : (
           <>
-            <PlayerCard player={player} size="lg" />
+            {/* La ficha de búsqueda siempre muestra la carta original del
+                jugador, no la variante especial TOTJ ni su boost temporal
+                (eso solo tiene sentido en el contexto del partido/jornada
+                que lo generó). */}
+            <PlayerCard
+              player={{ ...player, is_totw_active: false, current_card_rating: player.overall_rating }}
+              size="lg"
+            />
             {!player.calibrated && (
               <div className="mt-4 w-full rounded-xl bg-floodlight-500/10 border border-floodlight-500/30 px-4 py-3 text-xs text-floodlight-300/80 text-center">
                 Esta carta todavía no ha sido calibrada por el grupo.

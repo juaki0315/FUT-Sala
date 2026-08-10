@@ -19,7 +19,7 @@ export default function PlayersBrowser() {
 
   const filtered = players
     .filter((p) => p.username?.toLowerCase().includes(query.trim().toLowerCase()))
-    .sort((a, b) => b.current_card_rating - a.current_card_rating);
+    .sort((a, b) => b.overall_rating - a.overall_rating);
 
   return (
     <Layout>
@@ -78,7 +78,7 @@ export default function PlayersBrowser() {
                 </div>
               </div>
               <div className="font-display text-2xl text-gold-400 shrink-0">
-                {p.current_card_rating}
+                {p.overall_rating}
               </div>
               <ChevronRight size={16} className="text-floodlight-300/30 shrink-0" />
             </Link>
