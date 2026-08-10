@@ -1,6 +1,5 @@
 import { useRef, useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import { motion } from "framer-motion";
 import { Image as ImageIcon, LogOut, Settings, Upload } from "lucide-react";
 import Layout from "../components/Layout";
 import PageHeader from "../components/PageHeader";
@@ -135,22 +134,6 @@ export default function MyCard() {
             mejores de la jornada — esto es solo una vista previa.
           </p>
         </section>
-
-        {/* Atributos detallados */}
-        <motion.section
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.2 }}
-          className="w-full mt-8"
-        >
-          <h2 className="text-xs font-semibold uppercase tracking-widest text-floodlight-300/50 mb-3">
-            Progresión de media base
-          </h2>
-          <div className="rounded-xl bg-pitch-850 border border-pitch-700 p-4 flex items-center justify-between">
-            <span className="text-sm text-floodlight-300/60">Media dinámica acumulada</span>
-            <span className="font-display text-2xl text-gold-400">{profile.base_average}</span>
-          </div>
-        </motion.section>
 
         <Link
           to="/cuenta"

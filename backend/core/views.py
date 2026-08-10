@@ -56,6 +56,58 @@ class ChangePasswordView(APIView):
         return Response({"detail": "Contraseña actualizada correctamente."})
 
 
+class AdminUsersOverviewView(APIView):
+    """
+    Panel de admin: metadatos de cuenta y estado de participación de cada
+    usuario (última conexión, votos de calibración pendientes/hechos,
+    participación en votaciones de partidos).
+    """
+
+    permission_classes = [permissions.IsAdminUser]
+
+    def get(self, request):
+        finished_matches_count = Match.objects.filter(is_finished=True).count()
+        users = User.objects.select_related("profile").order_by("username")
+
+        data = []
+        for u in users:
+            profile = getattr(u, "profile", None)
+
+            assigned_target_ids = set(
+                EvaluatorAssignment.objects.filter(voter=u).values_list("target_id", flat=True)
+            )
+            completed_evaluations = (
+                InitialVote.objects.filter(voter=u, target_id__in=assigned_target_ids).count()
+                if assigned_target_ids
+                else 0
+            )
+            voted_matches = (
+                MatchVote.objects.filter(voter=u).values("match_id").distinct().count()
+            )
+
+            data.append({
+                "id": u.id,
+                "username": u.username,
+                "email": u.email,
+                "is_staff": u.is_staff,
+                "date_joined": u.date_joined,
+                "last_login": u.last_login,
+                "has_profile": profile is not None,
+                "calibrated": profile.calibrated if profile else None,
+                "overall_rating": profile.overall_rating if profile else None,
+                "photo_url": (
+                    PlayerProfileSerializer(profile, context={"request": request}).data["photo_url"]
+                    if profile
+                    else ""
+                ),
+                "assigned_evaluations": len(assigned_target_ids),
+                "completed_evaluations": completed_evaluations,
+                "finished_matches": finished_matches_count,
+                "voted_matches": voted_matches,
+            })
+        return Response(data)
+
+
 class RegisterView(APIView):
     permission_classes = [permissions.AllowAny]
 
@@ -161,6 +213,10 @@ class MatchViewSet(viewsets.ModelViewSet):
     def finish(self, request, pk=None):
         """Admin: cierra el partido con el marcador final y evoluciona las medias."""
         match = self.get_object()
+        if match.is_finished:
+            return Response(
+                {"detail": "Este partido ya fue finalizado."}, status=status.HTTP_400_BAD_REQUEST
+            )
         match.team_a_score = request.data.get("team_a_score")
         match.team_b_score = request.data.get("team_b_score")
         match.is_finished = True

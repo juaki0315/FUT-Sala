@@ -1,7 +1,7 @@
 """
 Lógica de negocio de FUT-Sala Tracker:
   1. Cálculo de valoración inicial con control de "trolling" de votos.
-  2. Evolución dinámica de la media base tras un partido finalizado.
+  2. Crecimiento permanente de los atributos tras un partido finalizado.
   3. Generación del Equipo de la Jornada (TOTJ) tras la votación post-partido.
 """
 
@@ -15,11 +15,17 @@ ATTR_FIELDS = ["ritmo", "tiro", "pase", "regate", "defensa", "fisico"]
 STAR_FIELDS = ["pierna_mala", "filigranas"]
 
 TOTW_BOOSTS = {1: 5, 2: 4, 3: 3, 4: 2, 5: 1}
-MVP_PERMANENT_BONUS = Decimal("0.5")
 
-WIN_DELTA = Decimal("0.2")
-LOSS_DELTA = Decimal("-0.1")
-DRAW_DELTA = Decimal("0.0")
+# Crecimiento permanente de los 6 atributos principales tras un partido,
+# según el resultado del equipo del jugador.
+GROWTH_BY_OUTCOME = {
+    "win": Decimal("1"),
+    "draw": Decimal("0.75"),
+    "loss": Decimal("0.5"),
+}
+# Bonus adicional, permanente, para quien sale en el Equipo de la Jornada
+# (aparte del boost temporal de OVR que ya recibe su carta).
+TOTW_GROWTH_BONUS = Decimal("1")
 
 
 def _trimmed_weighted_average(values: list[int]) -> float:
@@ -78,46 +84,62 @@ def apply_initial_rating(target_profile: PlayerProfile) -> PlayerProfile:
     values = calculate_initial_rating(target_profile)
     for field, value in values.items():
         setattr(target_profile, field, value)
-    target_profile.base_average = Decimal(
-        sum(values[f] for f in ATTR_FIELDS) / len(ATTR_FIELDS)
-    ).quantize(Decimal("0.01"))
     target_profile.calibrated = True
     target_profile.save()
     return target_profile
 
 
+def _apply_permanent_growth(profile: PlayerProfile, delta: Decimal) -> None:
+    """
+    Acumula crecimiento fraccional (0.5/0.75/1 por partido) en growth_carry y,
+    en cuanto se completa una unidad entera, la reparte como +1 punto en cada
+    uno de los 6 atributos principales (tope 99). Así un empate o una derrota
+    no se pierden por redondeo: dos empates (0.75+0.75=1.5) sí terminan dando
+    un punto real tarde o temprano.
+    """
+    profile.growth_carry = profile.growth_carry + delta
+    whole = int(profile.growth_carry)
+    if whole > 0:
+        for field in ATTR_FIELDS:
+            setattr(profile, field, min(99, getattr(profile, field) + whole))
+        profile.growth_carry = profile.growth_carry - whole
+    profile.save(update_fields=[*ATTR_FIELDS, "growth_carry"])
+
+
 @transaction.atomic
 def apply_match_result_evolution(match) -> None:
     """
-    Aplica la evolución dinámica de la media base a todos los participantes
-    de un partido ya finalizado, según el resultado (+0.2 victoria, -0.1
-    derrota, 0.0 empate).
+    Aplica el crecimiento permanente de atributos a todos los participantes
+    de un partido ya finalizado, según el resultado de su equipo
+    (+1 victoria, +0.75 empate, +0.5 derrota — nunca se resta).
     """
     if not match.is_finished or match.team_a_score is None or match.team_b_score is None:
         raise ValueError("El partido debe estar finalizado y con marcador para evolucionar medias.")
 
     if match.team_a_score > match.team_b_score:
-        delta_a, delta_b = WIN_DELTA, LOSS_DELTA
+        outcome_a, outcome_b = "win", "loss"
     elif match.team_a_score < match.team_b_score:
-        delta_a, delta_b = LOSS_DELTA, WIN_DELTA
+        outcome_a, outcome_b = "loss", "win"
     else:
-        delta_a, delta_b = DRAW_DELTA, DRAW_DELTA
+        outcome_a = outcome_b = "draw"
 
     for mp in match.participants.select_related("player"):
-        delta = delta_a if mp.team == "A" else delta_b
-        profile = mp.player
-        profile.base_average = profile.base_average + delta
-        profile.save(update_fields=["base_average"])
+        outcome = outcome_a if mp.team == "A" else outcome_b
+        _apply_permanent_growth(mp.player, GROWTH_BY_OUTCOME[outcome])
 
 
 @transaction.atomic
 def generate_totw(match) -> list[MatchPlayer]:
     """
     A partir de los MatchVote del partido, calcula el ranking (suma de puntos),
-    toma el Top 5 y les asigna la carta especial TOTJ con boost temporal.
-    El MVP (1er lugar) recibe además +0.5 permanente en base_average.
+    toma el Top 5 y les asigna la carta especial TOTJ con boost temporal, más
+    un +1 permanente en los 6 atributos para cada uno de los 5 (aparte del
+    boost temporal). Solo se puede generar una vez por partido.
     Devuelve la lista de MatchPlayer actualizados en orden de ranking.
     """
+    if match.totw_generated:
+        raise ValueError("El Equipo de la Jornada de este partido ya fue generado.")
+
     votes = MatchVote.objects.filter(match=match).select_related("voted_player")
     if not votes:
         raise ValueError("No hay votos post-partido registrados para este partido.")
@@ -128,7 +150,7 @@ def generate_totw(match) -> list[MatchPlayer]:
 
     ranking = sorted(tally.items(), key=lambda kv: kv[1], reverse=True)[:5]
 
-    # Reset de estado TOTJ previo de este partido (idempotencia)
+    # Reset de estado TOTJ previo de este partido (idempotencia visual)
     MatchPlayer.objects.filter(match=match).update(is_totw=False, totw_boost=0, totw_rank=None)
 
     updated = []
@@ -142,10 +164,10 @@ def generate_totw(match) -> list[MatchPlayer]:
         mp.save()
         updated.append(mp)
 
-        if rank == 1:
-            profile = mp.player
-            profile.base_average = profile.base_average + MVP_PERMANENT_BONUS
-            profile.save(update_fields=["base_average"])
+        _apply_permanent_growth(mp.player, TOTW_GROWTH_BONUS)
+
+    match.totw_generated = True
+    match.save(update_fields=["totw_generated"])
 
     return updated
 

@@ -41,4 +41,7 @@ export const api = {
   // Cuenta
   updateAccount: (payload) => client.patch("/auth/me/", payload),
   changePassword: (payload) => client.post("/auth/change-password/", payload),
+
+  // Panel de admin
+  adminUsersOverview: () => client.get("/admin/users-overview/"),
 };

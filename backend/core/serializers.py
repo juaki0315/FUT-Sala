@@ -70,12 +70,12 @@ class PlayerProfileSerializer(serializers.ModelSerializer):
         fields = [
             "id", "user", "username", "photo", "photo_url", "card_style",
             "ritmo", "tiro", "pase", "regate", "defensa", "fisico",
-            "pierna_mala", "filigranas", "base_average", "calibrated",
+            "pierna_mala", "filigranas", "calibrated",
             "overall_rating", "current_card_rating", "is_totw_active",
             "initial_votes_count", "assigned_voters_count", "assigned_voter_ids",
             "preview_rating",
         ]
-        read_only_fields = ["user", "base_average", "calibrated"]
+        read_only_fields = ["user", "calibrated"]
 
     def get_current_card_rating(self, obj):
         return obj.current_card_rating()
@@ -163,9 +163,9 @@ class MatchSerializer(serializers.ModelSerializer):
         model = Match
         fields = [
             "id", "date_played", "team_a_score", "team_b_score",
-            "is_finished", "created_by", "created_at", "participants",
+            "is_finished", "totw_generated", "created_by", "created_at", "participants",
         ]
-        read_only_fields = ["created_by", "created_at", "is_finished"]
+        read_only_fields = ["created_by", "created_at", "is_finished", "totw_generated"]
 
 
 class MatchVoteSerializer(serializers.ModelSerializer):

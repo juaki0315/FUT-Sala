@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import { ArrowLeft, ClipboardCheck, Calculator, Users2, ChevronDown, ChevronUp } from "lucide-react";
+import { ArrowLeft, ClipboardCheck, Calculator, Users2, ChevronDown, ChevronUp, LayoutDashboard } from "lucide-react";
 import Layout from "../components/Layout";
 import { api } from "../api/endpoints";
 import { useAuth } from "../context/AuthContext";
@@ -125,12 +125,20 @@ export default function CalibrationList() {
         <button onClick={() => navigate(-1)} className="text-floodlight-300/60">
           <ArrowLeft size={20} />
         </button>
-        <div>
+        <div className="flex-1">
           <div className="text-[11px] uppercase tracking-widest text-floodlight-500/70 font-semibold">
             Valoración inicial
           </div>
           <h1 className="font-display text-2xl text-floodlight-300 leading-none">Cartas por calibrar</h1>
         </div>
+        {isAdmin && (
+          <Link
+            to="/admin/usuarios"
+            className="h-9 w-9 rounded-full bg-pitch-850 border border-pitch-700 flex items-center justify-center text-floodlight-300/70 hover:text-gold-400 hover:border-gold-500/40 transition-colors shrink-0"
+          >
+            <LayoutDashboard size={16} />
+          </Link>
+        )}
       </div>
 
       <div className="px-5 py-5 space-y-3">

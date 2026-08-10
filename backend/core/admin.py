@@ -5,14 +5,14 @@ from .models import EvaluatorAssignment, InitialVote, Match, MatchPlayer, MatchV
 
 @admin.register(PlayerProfile)
 class PlayerProfileAdmin(admin.ModelAdmin):
-    list_display = ["user", "overall_rating", "base_average", "calibrated"]
+    list_display = ["user", "overall_rating", "growth_carry", "calibrated"]
     list_filter = ["calibrated", "card_style"]
     search_fields = ["user__username"]
 
 
 @admin.register(Match)
 class MatchAdmin(admin.ModelAdmin):
-    list_display = ["id", "date_played", "team_a_score", "team_b_score", "is_finished"]
+    list_display = ["id", "date_played", "team_a_score", "team_b_score", "is_finished", "totw_generated"]
     list_filter = ["is_finished"]
 
 

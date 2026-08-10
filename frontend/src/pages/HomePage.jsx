@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
-import { CalendarClock, ChevronRight, Trophy, ClipboardCheck } from "lucide-react";
+import { CalendarClock, ChevronRight, Trophy, ClipboardCheck, Search } from "lucide-react";
 import Layout from "../components/Layout";
 import PageHeader from "../components/PageHeader";
 import PlayerCard from "../components/PlayerCard";
@@ -59,7 +59,18 @@ export default function HomePage() {
 
   return (
     <Layout>
-      <PageHeader eyebrow="Jornada actual" title="Inicio" />
+      <PageHeader
+        eyebrow="Jornada actual"
+        title="Inicio"
+        action={
+          <Link
+            to="/jugadores"
+            className="h-9 w-9 rounded-full bg-pitch-850 border border-pitch-700 flex items-center justify-center text-floodlight-300/70 hover:text-gold-400 hover:border-gold-500/40 transition-colors"
+          >
+            <Search size={16} />
+          </Link>
+        }
+      />
 
       <div className="px-5 py-5 space-y-6">
         {/* Cartas por calibrar */}

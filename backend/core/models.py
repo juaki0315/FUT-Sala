@@ -28,8 +28,9 @@ class PlayerProfile(models.Model):
     pierna_mala = models.PositiveSmallIntegerField(default=3, validators=STAR_VALIDATORS)
     filigranas = models.PositiveSmallIntegerField(default=3, validators=STAR_VALIDATORS)
 
-    # Media dinámica acumulada por resultados de partidos (con decimales)
-    base_average = models.DecimalField(max_digits=5, decimal_places=2, default=50)
+    # Crecimiento fraccional acumulado (0.5/0.75/1 por partido) pendiente de
+    # convertirse en puntos enteros sobre los 6 atributos principales.
+    growth_carry = models.DecimalField(max_digits=6, decimal_places=2, default=0)
 
     calibrated = models.BooleanField(
         default=False, help_text="True una vez completada la valoración inicial por votos"
@@ -67,6 +68,9 @@ class Match(models.Model):
     team_a_score = models.PositiveSmallIntegerField(null=True, blank=True)
     team_b_score = models.PositiveSmallIntegerField(null=True, blank=True)
     is_finished = models.BooleanField(default=False)
+    # Evita aplicar dos veces el crecimiento permanente del TOTJ si el admin
+    # pulsa "Generar Equipo de la Jornada" más de una vez sobre el mismo partido.
+    totw_generated = models.BooleanField(default=False)
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, related_name="matches_created"
     )

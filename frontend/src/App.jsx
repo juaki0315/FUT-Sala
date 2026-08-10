@@ -11,6 +11,9 @@ import Totw from "./pages/Totw";
 import CalibrationList from "./pages/CalibrationList";
 import CalibrateForm from "./pages/CalibrateForm";
 import AccountSettings from "./pages/AccountSettings";
+import PlayersBrowser from "./pages/PlayersBrowser";
+import PlayerDetail from "./pages/PlayerDetail";
+import AdminUsersOverview from "./pages/AdminUsersOverview";
 
 function PrivateRoute({ children }) {
   const { user, ready } = useAuth();
@@ -83,6 +86,30 @@ function AppRoutes() {
         element={
           <PrivateRoute>
             <CalibrateForm />
+          </PrivateRoute>
+        }
+      />
+      <Route
+        path="/jugadores"
+        element={
+          <PrivateRoute>
+            <PlayersBrowser />
+          </PrivateRoute>
+        }
+      />
+      <Route
+        path="/jugadores/:id"
+        element={
+          <PrivateRoute>
+            <PlayerDetail />
+          </PrivateRoute>
+        }
+      />
+      <Route
+        path="/admin/usuarios"
+        element={
+          <PrivateRoute>
+            <AdminUsersOverview />
           </PrivateRoute>
         }
       />

@@ -3,10 +3,9 @@ import { useParams, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { ArrowLeft, Users, Trophy, Vote, Flag } from "lucide-react";
 import Layout from "../components/Layout";
+import PitchLineup from "../components/PitchLineup";
 import { api } from "../api/endpoints";
 import { useAuth } from "../context/AuthContext";
-
-const TEAM_LABEL = { A: "Equipo A", B: "Equipo B" };
 
 export default function MatchDetail() {
   const { id } = useParams();
@@ -55,9 +54,14 @@ export default function MatchDetail() {
 
   const finish = async (e) => {
     e.preventDefault();
-    await api.finishMatch(id, { team_a_score: Number(scoreA), team_b_score: Number(scoreB) });
-    setMsg("Partido cerrado y medias actualizadas.");
-    load();
+    setError("");
+    try {
+      await api.finishMatch(id, { team_a_score: Number(scoreA), team_b_score: Number(scoreB) });
+      setMsg("Partido cerrado y medias actualizadas.");
+      load();
+    } catch (err) {
+      setError(err.response?.data?.detail || err.friendlyMessage || "No se pudo cerrar el partido.");
+    }
   };
 
   const toggleTop5 = (playerId) => {
@@ -87,9 +91,14 @@ export default function MatchDetail() {
   };
 
   const runTotw = async () => {
-    await api.generateTotw(id);
-    setMsg("TOTJ generado.");
-    load();
+    setError("");
+    try {
+      await api.generateTotw(id);
+      setMsg("TOTJ generado.");
+      load();
+    } catch (err) {
+      setError(err.response?.data?.detail || err.friendlyMessage || "No se pudo generar el TOTJ.");
+    }
   };
 
   if (loading || !match) {
@@ -141,29 +150,18 @@ export default function MatchDetail() {
           </div>
         )}
 
+        {error && (
+          <div className="rounded-lg bg-red-500/10 border border-red-500/30 px-3 py-2 text-xs text-red-300">
+            {error}
+          </div>
+        )}
+
         {/* Alineaciones */}
         <section>
           <h2 className="text-xs font-semibold uppercase tracking-widest text-floodlight-300/50 mb-3 flex items-center gap-1.5">
             <Users size={13} /> Alineaciones
           </h2>
-          <div className="grid grid-cols-2 gap-3">
-            {["A", "B"].map((team) => (
-              <div key={team} className="rounded-xl bg-pitch-850 border border-pitch-700 p-3">
-                <div className="text-xs font-semibold text-floodlight-300/60 mb-2">{TEAM_LABEL[team]}</div>
-                <div className="space-y-1.5">
-                  {(team === "A" ? teamA : teamB).map((mp) => (
-                    <div key={mp.id} className="text-sm text-floodlight-300 flex items-center justify-between">
-                      <span className="truncate">{mp.player_detail?.username}</span>
-                      {mp.is_totw && <Trophy size={12} className="text-gold-400 shrink-0" />}
-                    </div>
-                  ))}
-                  {(team === "A" ? teamA : teamB).length === 0 && (
-                    <div className="text-xs text-floodlight-300/30">Sin jugadores</div>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
+          <PitchLineup teamA={teamA} teamB={teamB} />
 
           {isAdmin && !match.is_finished && unassigned.length > 0 && (
             <div className="mt-3 rounded-xl bg-pitch-850 border border-dashed border-pitch-700 p-3">
@@ -231,12 +229,6 @@ export default function MatchDetail() {
               <Vote size={13} /> Vota tu Top 5 de la jornada
             </h2>
 
-            {error && (
-              <div className="mb-2 rounded-lg bg-red-500/10 border border-red-500/30 px-3 py-2 text-xs text-red-300">
-                {error}
-              </div>
-            )}
-
             {myVotes ? (
               <div className="rounded-xl bg-pitch-850 border border-pitch-700 p-3 space-y-1.5">
                 <div className="text-xs text-floodlight-300/50 mb-1">
@@ -288,7 +280,7 @@ export default function MatchDetail() {
               </>
             )}
 
-            {isAdmin && (
+            {isAdmin && !match.totw_generated && (
               <button
                 onClick={runTotw}
                 className="mt-2 w-full rounded-xl border border-totw-purple bg-totw-purple/20 py-3 text-sm font-semibold text-gold-300"

@@ -161,6 +161,9 @@ SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(hours=12),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=14),
     'ROTATE_REFRESH_TOKENS': True,
+    # Necesario para que User.last_login se actualice al hacer login (por
+    # defecto SimpleJWT no lo toca, ya que no usa el login de sesión de Django).
+    'UPDATE_LAST_LOGIN': True,
 }
 
 # En desarrollo abrimos CORS a todo. En producción se define CORS_ALLOWED_ORIGINS
