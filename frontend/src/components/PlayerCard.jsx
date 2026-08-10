@@ -59,8 +59,10 @@ export default function PlayerCard({ player, size = "md", animated = true }) {
   const tier = getTier(player.overall_rating);
 
   const dims = size === "sm" ? "w-36" : size === "lg" ? "w-64" : "w-48";
-  const avatarSize = size === "sm" ? "h-14 w-14" : size === "lg" ? "h-28 w-28" : "h-20 w-20";
-  const avatarText = size === "lg" ? "text-3xl" : size === "sm" ? "text-lg" : "text-2xl";
+  // En "sm" la fila OVR+estrellas ya casi llena el ancho disponible, así que
+  // el aro tiene que ser más pequeño para no recortarse contra el borde.
+  const avatarSize = size === "sm" ? "h-12 w-12" : size === "lg" ? "h-28 w-28" : "h-20 w-20";
+  const avatarText = size === "lg" ? "text-3xl" : size === "sm" ? "text-base" : "text-2xl";
 
   const frame = isTotw
     ? "bg-gradient-to-b from-pitch-950 via-totw-purple to-gold-500 text-gold-300"
@@ -72,8 +74,11 @@ export default function PlayerCard({ player, size = "md", animated = true }) {
   const Wrapper = animated ? motion.div : "div";
   const animProps = animated
     ? {
-        initial: { opacity: 0, y: 16, rotateY: -8 },
-        animate: { opacity: 1, y: 0, rotateY: 0 },
+        // Sin rotateY: combinar una transformación 3D con overflow-hidden hace
+        // que Safari/iOS no recorte bien el aro de la foto durante el giro
+        // (se ve "salirse" de la carta un instante en las cartas pequeñas).
+        initial: { opacity: 0, y: 16 },
+        animate: { opacity: 1, y: 0 },
         transition: { duration: 0.5, ease: "easeOut" },
         whileTap: { scale: 0.97 },
       }
@@ -82,13 +87,13 @@ export default function PlayerCard({ player, size = "md", animated = true }) {
   return (
     <Wrapper
       {...animProps}
-      className={`relative ${dims} aspect-[2/3] rounded-2xl ${frame} p-3 flex flex-col shadow-xl shadow-black/40 overflow-hidden ${
+      className={`relative ${dims} shrink-0 aspect-[2/3] rounded-2xl ${frame} p-3 flex flex-col shadow-xl shadow-black/40 overflow-hidden ${
         isTotw ? "card-sheen ring-1 ring-gold-400/60" : ""
       }`}
     >
       {/* Cabecera: OVR + estrellas + foto */}
       <div className="flex items-center justify-between">
-        <div className="text-left leading-none">
+        <div className="text-left leading-none shrink-0">
           <div className={`font-display text-4xl font-semibold ${accent}`}>{ovr}</div>
           <div className="mt-1 flex flex-col gap-0.5 text-[10px] font-semibold opacity-80">
             <Stars count={player.pierna_mala} />
@@ -96,7 +101,9 @@ export default function PlayerCard({ player, size = "md", animated = true }) {
           </div>
         </div>
         <div
-          className={`${avatarSize} shrink-0 rounded-full bg-white/5 overflow-hidden flex items-center justify-center border-[3px] ${ringColor} shadow-lg shadow-black/40`}
+          className={`${avatarSize} shrink-0 rounded-full bg-white/5 overflow-hidden flex items-center justify-center ${
+            size === "sm" ? "border-2" : "border-[3px]"
+          } ${ringColor} shadow-lg shadow-black/40`}
         >
           {player.photo_url ? (
             <img src={player.photo_url} alt={player.username} className="h-full w-full object-cover" />
