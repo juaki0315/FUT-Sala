@@ -64,6 +64,7 @@ class PlayerProfileSerializer(serializers.ModelSerializer):
     preview_rating = serializers.SerializerMethodField()
     photo = serializers.ImageField(write_only=True, required=False, allow_null=True)
     photo_url = serializers.SerializerMethodField()
+    stats = serializers.SerializerMethodField()
 
     class Meta:
         model = PlayerProfile
@@ -73,7 +74,7 @@ class PlayerProfileSerializer(serializers.ModelSerializer):
             "pierna_mala", "filigranas", "calibrated",
             "overall_rating", "current_card_rating", "is_totw_active",
             "initial_votes_count", "assigned_voters_count", "assigned_voter_ids",
-            "preview_rating",
+            "preview_rating", "stats",
         ]
         read_only_fields = ["user", "calibrated"]
 
@@ -108,6 +109,9 @@ class PlayerProfileSerializer(serializers.ModelSerializer):
             return None
         overall = round(sum(values[f] for f in services.ATTR_FIELDS) / len(services.ATTR_FIELDS))
         return {**values, "overall_rating": overall}
+
+    def get_stats(self, obj):
+        return services.get_player_stats(obj)
 
 
 class EvaluatorAssignmentSerializer(serializers.ModelSerializer):
@@ -152,7 +156,7 @@ class MatchPlayerSerializer(serializers.ModelSerializer):
         model = MatchPlayer
         fields = [
             "id", "match", "player", "player_detail", "team",
-            "is_totw", "totw_boost", "totw_rank",
+            "is_totw", "totw_boost", "totw_rank", "goals", "assists",
         ]
 
 

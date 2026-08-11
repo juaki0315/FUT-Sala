@@ -26,6 +26,13 @@ function PlayerChip({ mp }) {
       <span className="text-[10px] font-display text-gold-400 leading-none">
         {p.current_card_rating ?? p.overall_rating}
       </span>
+      {(mp.goals > 0 || mp.assists > 0) && (
+        <span className="text-[9px] text-floodlight-300/50 leading-none">
+          {mp.goals > 0 && `${mp.goals}G`}
+          {mp.goals > 0 && mp.assists > 0 && " · "}
+          {mp.assists > 0 && `${mp.assists}A`}
+        </span>
+      )}
     </Link>
   );
 }

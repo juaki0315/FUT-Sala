@@ -32,6 +32,11 @@ class PlayerProfile(models.Model):
     # convertirse en puntos enteros sobre los 6 atributos principales.
     growth_carry = models.DecimalField(max_digits=6, decimal_places=2, default=0)
 
+    # Goles/asistencias acumulados desde el último punto de tiro/pase ganado
+    # (cada 4 goles = +1 tiro, cada 3 asistencias = +1 pase, permanente).
+    goal_progress = models.PositiveSmallIntegerField(default=0)
+    assist_progress = models.PositiveSmallIntegerField(default=0)
+
     calibrated = models.BooleanField(
         default=False, help_text="True una vez completada la valoración inicial por votos"
     )
@@ -89,6 +94,8 @@ class MatchPlayer(models.Model):
     is_totw = models.BooleanField(default=False)  # Equipo de la Jornada
     totw_boost = models.PositiveSmallIntegerField(default=0)
     totw_rank = models.PositiveSmallIntegerField(null=True, blank=True)  # 1..5
+    goals = models.PositiveSmallIntegerField(default=0)
+    assists = models.PositiveSmallIntegerField(default=0)
 
     class Meta:
         unique_together = ("match", "player")

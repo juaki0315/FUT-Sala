@@ -4,6 +4,7 @@ import { Image as ImageIcon, LogOut, Settings, Upload } from "lucide-react";
 import Layout from "../components/Layout";
 import PageHeader from "../components/PageHeader";
 import PlayerCard from "../components/PlayerCard";
+import PlayerStats from "../components/PlayerStats";
 import { api } from "../api/endpoints";
 import { useAuth } from "../context/AuthContext";
 
@@ -79,6 +80,10 @@ export default function MyCard() {
             encuesta inicial para que el grupo valore tus atributos.
           </div>
         )}
+
+        <div className="w-full mt-8">
+          <PlayerStats stats={profile.stats} />
+        </div>
 
         {/* Personalización visual */}
         <section className="w-full mt-8">

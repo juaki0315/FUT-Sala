@@ -232,7 +232,11 @@ class MatchViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=["post"])
     def finish(self, request, pk=None):
-        """Admin: cierra el partido con el marcador final y evoluciona las medias."""
+        """
+        Admin: cierra el partido con el marcador final, evoluciona las medias
+        y registra goles/asistencias por jugador (opcional).
+        Body: {team_a_score, team_b_score, stats: [{player, goals, assists}, ...]}
+        """
         match = self.get_object()
         if match.is_finished:
             return Response(
@@ -246,6 +250,12 @@ class MatchViewSet(viewsets.ModelViewSet):
             services.apply_match_result_evolution(match)
         except ValueError as e:
             return Response({"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+        stats_list = request.data.get("stats", [])
+        stats = {entry["player"]: entry for entry in stats_list if entry.get("player")}
+        if stats:
+            services.record_match_stats(match, stats)
+
         return Response(MatchSerializer(match, context={"request": request}).data)
 
     @action(detail=True, methods=["post"])

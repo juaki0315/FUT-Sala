@@ -27,6 +27,11 @@ GROWTH_BY_OUTCOME = {
 # (aparte del boost temporal de OVR que ya recibe su carta).
 TOTW_GROWTH_BONUS = Decimal("1")
 
+# Cada N goles/asistencias de un jugador suman +1 permanente al atributo
+# correspondiente (tiro/pase).
+GOALS_PER_TIRO_POINT = 4
+ASSISTS_PER_PASE_POINT = 3
+
 
 def _trimmed_weighted_average(values: list[int]) -> float:
     """
@@ -126,6 +131,81 @@ def apply_match_result_evolution(match) -> None:
     for mp in match.participants.select_related("player"):
         outcome = outcome_a if mp.team == "A" else outcome_b
         _apply_permanent_growth(mp.player, GROWTH_BY_OUTCOME[outcome])
+
+
+def _apply_stat_growth(profile: PlayerProfile, goals: int, assists: int) -> None:
+    """
+    Acumula goles/asistencias en goal_progress/assist_progress y, al superar
+    el umbral (4 goles / 3 asistencias), suma +1 permanente a tiro/pase
+    respectivamente (tope 99). El resto se queda guardado para la próxima vez.
+    """
+    update_fields = []
+    if goals:
+        profile.goal_progress += goals
+        whole = profile.goal_progress // GOALS_PER_TIRO_POINT
+        if whole:
+            profile.tiro = min(99, profile.tiro + whole)
+            profile.goal_progress -= whole * GOALS_PER_TIRO_POINT
+            update_fields.append("tiro")
+        update_fields.append("goal_progress")
+    if assists:
+        profile.assist_progress += assists
+        whole = profile.assist_progress // ASSISTS_PER_PASE_POINT
+        if whole:
+            profile.pase = min(99, profile.pase + whole)
+            profile.assist_progress -= whole * ASSISTS_PER_PASE_POINT
+            update_fields.append("pase")
+        update_fields.append("assist_progress")
+    if update_fields:
+        profile.save(update_fields=update_fields)
+
+
+@transaction.atomic
+def record_match_stats(match, stats: dict) -> None:
+    """
+    Registra los goles/asistencias de cada participante de un partido
+    (introducidos por el admin al cerrar el resultado) y aplica el
+    crecimiento permanente de tiro/pase correspondiente. `stats` es un dict
+    {player_id: {"goals": int, "assists": int}}; solo se llama una vez, en el
+    mismo momento en que se cierra el partido.
+    """
+    for mp in match.participants.select_related("player"):
+        entry = stats.get(mp.player_id) or stats.get(str(mp.player_id)) or {}
+        goals = int(entry.get("goals") or 0)
+        assists = int(entry.get("assists") or 0)
+        if goals or assists:
+            mp.goals = goals
+            mp.assists = assists
+            mp.save(update_fields=["goals", "assists"])
+            _apply_stat_growth(mp.player, goals, assists)
+
+
+def get_player_stats(profile: PlayerProfile) -> dict:
+    """Estadísticas de carrera de un jugador: partidos, V/E/D, goles, asistencias."""
+    history = list(
+        MatchPlayer.objects.filter(player=profile, match__is_finished=True).select_related("match")
+    )
+    wins = losses = draws = goals = assists = 0
+    for mp in history:
+        match = mp.match
+        if match.team_a_score is None or match.team_b_score is None:
+            continue
+        if match.team_a_score == match.team_b_score:
+            draws += 1
+        elif (match.team_a_score > match.team_b_score) == (mp.team == "A"):
+            wins += 1
+        else:
+            losses += 1
+        goals += mp.goals
+        assists += mp.assists
+    return {
+        "matches_played": len(history),
+        "wins": wins,
+        "losses": losses,
+        "draws": draws,
+        "goals": goals,
+        "assists": assists,
+    }
 
 
 @transaction.atomic

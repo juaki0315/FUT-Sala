@@ -3,6 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import Layout from "../components/Layout";
 import PlayerCard from "../components/PlayerCard";
+import PlayerStats from "../components/PlayerStats";
 import { api } from "../api/endpoints";
 
 export default function PlayerDetail() {
@@ -53,6 +54,9 @@ export default function PlayerDetail() {
                 Esta carta todavía no ha sido calibrada por el grupo.
               </div>
             )}
+            <div className="mt-6 w-full">
+              <PlayerStats stats={player.stats} />
+            </div>
           </>
         )}
       </div>

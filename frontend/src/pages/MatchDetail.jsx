@@ -1,7 +1,7 @@
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, Users, Trophy, Vote, Flag, BarChart3 } from "lucide-react";
+import { ArrowLeft, Users, Trophy, Vote, Flag, BarChart3, Goal } from "lucide-react";
 import Layout from "../components/Layout";
 import PitchLineup from "../components/PitchLineup";
 import { api } from "../api/endpoints";
@@ -16,6 +16,7 @@ export default function MatchDetail() {
   const [loading, setLoading] = useState(true);
   const [scoreA, setScoreA] = useState("");
   const [scoreB, setScoreB] = useState("");
+  const [playerStats, setPlayerStats] = useState({});
   const [selectedTop5, setSelectedTop5] = useState([]);
   const [totw, setTotw] = useState([]);
   const [msg, setMsg] = useState("");
@@ -54,11 +55,23 @@ export default function MatchDetail() {
     load();
   };
 
+  const setStat = (playerId, field, value) => {
+    setPlayerStats((prev) => ({
+      ...prev,
+      [playerId]: { ...prev[playerId], [field]: value },
+    }));
+  };
+
   const finish = async (e) => {
     e.preventDefault();
     setError("");
     try {
-      await api.finishMatch(id, { team_a_score: Number(scoreA), team_b_score: Number(scoreB) });
+      const stats = match.participants.map((mp) => ({
+        player: mp.player,
+        goals: Number(playerStats[mp.player]?.goals || 0),
+        assists: Number(playerStats[mp.player]?.assists || 0),
+      }));
+      await api.finishMatch(id, { team_a_score: Number(scoreA), team_b_score: Number(scoreB), stats });
       setMsg("Partido cerrado y medias actualizadas.");
       load();
     } catch (err) {
@@ -226,25 +239,66 @@ export default function MatchDetail() {
             <h2 className="text-xs font-semibold uppercase tracking-widest text-floodlight-300/50 mb-3 flex items-center gap-1.5">
               <Flag size={13} /> Cerrar partido
             </h2>
-            <form onSubmit={finish} className="flex items-center gap-2">
-              <input
-                type="number"
-                min="0"
-                placeholder="A"
-                value={scoreA}
-                onChange={(e) => setScoreA(e.target.value)}
-                className="w-16 text-center rounded-xl bg-pitch-850 border border-pitch-700 py-2.5 text-floodlight-300 outline-none focus:border-gold-500"
-              />
-              <span className="text-floodlight-300/40 font-display text-xl">-</span>
-              <input
-                type="number"
-                min="0"
-                placeholder="B"
-                value={scoreB}
-                onChange={(e) => setScoreB(e.target.value)}
-                className="w-16 text-center rounded-xl bg-pitch-850 border border-pitch-700 py-2.5 text-floodlight-300 outline-none focus:border-gold-500"
-              />
-              <button className="flex-1 rounded-xl bg-gold-500 py-2.5 text-sm font-semibold text-pitch-900">
+            <form onSubmit={finish} className="space-y-4">
+              <div className="flex items-center gap-2">
+                <input
+                  type="number"
+                  min="0"
+                  placeholder="A"
+                  value={scoreA}
+                  onChange={(e) => setScoreA(e.target.value)}
+                  className="w-16 text-center rounded-xl bg-pitch-850 border border-pitch-700 py-2.5 text-floodlight-300 outline-none focus:border-gold-500"
+                />
+                <span className="text-floodlight-300/40 font-display text-xl">-</span>
+                <input
+                  type="number"
+                  min="0"
+                  placeholder="B"
+                  value={scoreB}
+                  onChange={(e) => setScoreB(e.target.value)}
+                  className="w-16 text-center rounded-xl bg-pitch-850 border border-pitch-700 py-2.5 text-floodlight-300 outline-none focus:border-gold-500"
+                />
+              </div>
+
+              {match.participants.length > 0 && (
+                <div className="rounded-xl bg-pitch-850 border border-pitch-700 p-3">
+                  <div className="text-xs font-semibold text-floodlight-300/50 mb-2 flex items-center gap-1.5">
+                    <Goal size={13} /> Goles y asistencias (opcional)
+                  </div>
+                  <div className="grid grid-cols-[1fr_3.5rem_3.5rem] gap-x-2 gap-y-2 items-center">
+                    <span className="text-[10px] font-semibold text-floodlight-300/40 uppercase" />
+                    <span className="text-[10px] font-semibold text-floodlight-300/40 uppercase text-center">
+                      Goles
+                    </span>
+                    <span className="text-[10px] font-semibold text-floodlight-300/40 uppercase text-center">
+                      Asist.
+                    </span>
+                    {match.participants.map((mp) => (
+                      <Fragment key={mp.id}>
+                        <span className="text-sm text-floodlight-300 truncate">
+                          {mp.player_detail?.username}
+                        </span>
+                        <input
+                          type="number"
+                          min="0"
+                          value={playerStats[mp.player]?.goals ?? ""}
+                          onChange={(e) => setStat(mp.player, "goals", e.target.value)}
+                          className="w-14 text-center rounded-lg bg-pitch-900 border border-pitch-700 py-1.5 text-sm text-floodlight-300 outline-none focus:border-gold-500"
+                        />
+                        <input
+                          type="number"
+                          min="0"
+                          value={playerStats[mp.player]?.assists ?? ""}
+                          onChange={(e) => setStat(mp.player, "assists", e.target.value)}
+                          className="w-14 text-center rounded-lg bg-pitch-900 border border-pitch-700 py-1.5 text-sm text-floodlight-300 outline-none focus:border-gold-500"
+                        />
+                      </Fragment>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <button className="w-full rounded-xl bg-gold-500 py-2.5 text-sm font-semibold text-pitch-900">
                 Finalizar partido
               </button>
             </form>
