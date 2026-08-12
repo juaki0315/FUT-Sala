@@ -29,6 +29,7 @@ export const api = {
   listMatches: () => client.get("/matches/"),
   getMatch: (id) => client.get(`/matches/${id}/`),
   createMatch: (payload) => client.post("/matches/", payload),
+  deleteMatch: (id) => client.delete(`/matches/${id}/`),
   addPlayersToMatch: (id, players) => client.post(`/matches/${id}/add_players/`, { players }),
   finishMatch: (id, scores) => client.post(`/matches/${id}/finish/`, scores),
   generateTotw: (id) => client.post(`/matches/${id}/generate_totw/`),

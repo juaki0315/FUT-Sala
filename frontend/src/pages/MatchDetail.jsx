@@ -1,7 +1,7 @@
 import { Fragment, useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, Users, Trophy, Vote, Flag, BarChart3, Goal } from "lucide-react";
+import { ArrowLeft, Users, Trophy, Vote, Flag, BarChart3, Goal, Trash2 } from "lucide-react";
 import Layout from "../components/Layout";
 import PitchLineup from "../components/PitchLineup";
 import { api } from "../api/endpoints";
@@ -24,6 +24,7 @@ export default function MatchDetail() {
   const [myVotes, setMyVotes] = useState(null);
   const [allVotes, setAllVotes] = useState([]);
   const [votingSaving, setVotingSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const isAdmin = user?.is_staff;
 
@@ -106,6 +107,24 @@ export default function MatchDetail() {
       setError(Array.isArray(msg) ? msg[0] : msg || "No se pudo registrar el voto.");
     } finally {
       setVotingSaving(false);
+    }
+  };
+
+  const deleteMatch = async () => {
+    const confirmed = window.confirm(
+      "¿Eliminar este partido para siempre?\n\n" +
+        "Desaparecerá del historial y de las estadísticas (partidos, goles, asistencias, TOTJ) de todos los jugadores convocados. " +
+        "Los atributos de las cartas que ya hayan subido por este partido no se revierten."
+    );
+    if (!confirmed) return;
+    setDeleting(true);
+    setError("");
+    try {
+      await api.deleteMatch(id);
+      navigate("/partidos");
+    } catch (err) {
+      setError(err.response?.data?.detail || err.friendlyMessage || "No se pudo eliminar el partido.");
+      setDeleting(false);
     }
   };
 
@@ -438,6 +457,18 @@ export default function MatchDetail() {
             </motion.section>
           )}
         </AnimatePresence>
+
+        {isAdmin && (
+          <section>
+            <button
+              onClick={deleteMatch}
+              disabled={deleting}
+              className="w-full flex items-center justify-center gap-2 rounded-xl border border-red-500/30 py-3 text-sm font-semibold text-red-300 hover:bg-red-500/10 disabled:opacity-50"
+            >
+              <Trash2 size={16} /> {deleting ? "Eliminando..." : "Eliminar partido"}
+            </button>
+          </section>
+        )}
       </div>
     </Layout>
   );
