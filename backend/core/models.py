@@ -37,6 +37,12 @@ class PlayerProfile(models.Model):
     goal_progress = models.PositiveSmallIntegerField(default=0)
     assist_progress = models.PositiveSmallIntegerField(default=0)
 
+    # Último partido cuya "revelación" (resultado, TOTJ, insignias nuevas) ya
+    # se le ha mostrado a este jugador al abrir la app. Evita repetírsela.
+    last_reveal_seen_match = models.ForeignKey(
+        "Match", on_delete=models.SET_NULL, null=True, blank=True, related_name="+"
+    )
+
     calibrated = models.BooleanField(
         default=False, help_text="True una vez completada la valoración inicial por votos"
     )
@@ -80,6 +86,13 @@ class Match(models.Model):
         settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, related_name="matches_created"
     )
     created_at = models.DateTimeField(auto_now_add=True)
+    # Momento real en que se cerró / se generó el TOTJ (independiente de
+    # date_played, que es solo la fecha del partido). Se usan para ordenar
+    # el feed de actividad y para detectar la "revelación" pendiente de cada
+    # jugador sin depender de una fecha que el admin puede haber puesto en
+    # el pasado o el futuro.
+    finished_at = models.DateTimeField(null=True, blank=True)
+    totw_generated_at = models.DateTimeField(null=True, blank=True)
 
     def __str__(self):
         return f"Partido {self.date_played:%Y-%m-%d} ({self.team_a_score}-{self.team_b_score})"
@@ -112,6 +125,11 @@ class PlayerBadge(models.Model):
     player = models.ForeignKey(PlayerProfile, on_delete=models.CASCADE, related_name="badges")
     code = models.CharField(max_length=40)
     unlocked_at = models.DateTimeField(auto_now_add=True)
+    # Partido que la desbloqueó (si aplica), para poder mostrarla en la
+    # "revelación" del jugador tras esa jornada. No se sobreescribe.
+    match = models.ForeignKey(
+        "Match", on_delete=models.SET_NULL, null=True, blank=True, related_name="badges_awarded"
+    )
 
     class Meta:
         unique_together = ("player", "code")

@@ -35,6 +35,11 @@ export const api = {
   generateTotw: (id) => client.post(`/matches/${id}/generate_totw/`),
   currentTotw: (id) => client.get(`/matches/${id}/current_totw/`),
 
+  // Feed de actividad y revelación post-jornada
+  activityFeed: () => client.get("/activity/"),
+  pendingReveal: () => client.get("/players/me/pending_reveal/"),
+  dismissReveal: (matchId) => client.post("/players/me/dismiss_reveal/", { match_id: matchId }),
+
   // Votación post-partido (inmutable: se manda el Top 5 completo en una sola petición)
   submitMatchVotes: (matchId, votes) => client.post(`/matches/${matchId}/vote/`, { votes }),
   listMatchVotes: (matchId) => client.get(`/match-votes/?match=${matchId}`),

@@ -5,6 +5,7 @@ import { CalendarClock, ChevronRight, Trophy, ClipboardCheck, Search } from "luc
 import Layout from "../components/Layout";
 import PageHeader from "../components/PageHeader";
 import PlayerCard from "../components/PlayerCard";
+import ActivityFeed from "../components/ActivityFeed";
 import { api } from "../api/endpoints";
 import { useAuth } from "../context/AuthContext";
 
@@ -94,6 +95,8 @@ export default function HomePage() {
             </div>
           </Link>
         )}
+
+        <ActivityFeed />
 
         {/* Próximo partido */}
         <section>

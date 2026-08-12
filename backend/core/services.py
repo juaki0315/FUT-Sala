@@ -8,8 +8,9 @@ Lógica de negocio de FUT-Sala Tracker:
 from decimal import Decimal, ROUND_HALF_UP
 
 from django.db import transaction
+from django.utils import timezone
 
-from .models import InitialVote, MatchPlayer, MatchVote, PlayerBadge, PlayerProfile
+from .models import InitialVote, Match, MatchPlayer, MatchVote, PlayerBadge, PlayerProfile
 
 ATTR_FIELDS = ["ritmo", "tiro", "pase", "regate", "defensa", "fisico"]
 STAR_FIELDS = ["pierna_mala", "filigranas"]
@@ -286,7 +287,8 @@ def generate_totw(match) -> list[MatchPlayer]:
         _apply_permanent_growth(mp.player, TOTW_GROWTH_BONUS)
 
     match.totw_generated = True
-    match.save(update_fields=["totw_generated"])
+    match.totw_generated_at = timezone.now()
+    match.save(update_fields=["totw_generated", "totw_generated_at"])
 
     return updated
 
@@ -354,34 +356,36 @@ BADGE_DEFINITIONS = {
 }
 
 
-def _unlock_badge(profile: PlayerProfile, code: str) -> None:
-    PlayerBadge.objects.get_or_create(player=profile, code=code)
+def _unlock_badge(profile: PlayerProfile, code: str, match=None) -> None:
+    PlayerBadge.objects.get_or_create(player=profile, code=code, defaults={"match": match})
 
 
-def evaluate_badges_for_player(profile: PlayerProfile) -> None:
+def evaluate_badges_for_player(profile: PlayerProfile, match=None) -> None:
     """
     Recalcula todas las condiciones de insignias a partir del estado actual
     del jugador y desbloquea (de forma permanente e idempotente) las que
     correspondan. Las insignias ya desbloqueadas nunca se revocan, aunque la
-    racha que las originó se rompa más adelante.
+    racha que las originó se rompa más adelante. `match` (si se indica) queda
+    registrado como el partido que originó cada insignia nueva, para poder
+    mostrarlo en la "revelación" post-jornada del jugador.
     """
     history = get_player_match_history(profile)  # más reciente primero
     matches_played = len(history)
 
     if matches_played >= 3:
-        _unlock_badge(profile, "matches_3")
+        _unlock_badge(profile, "matches_3", match)
     if matches_played >= 6:
-        _unlock_badge(profile, "matches_6")
+        _unlock_badge(profile, "matches_6", match)
     if matches_played >= 10:
-        _unlock_badge(profile, "matches_10")
+        _unlock_badge(profile, "matches_10", match)
 
     for h in history:
         if h["goals"] >= 3:
-            _unlock_badge(profile, "hat_trick")
+            _unlock_badge(profile, "hat_trick", match)
         if h["goals"] >= 5:
-            _unlock_badge(profile, "manita")
+            _unlock_badge(profile, "manita", match)
         if h["assists"] >= 3:
-            _unlock_badge(profile, "playmaker")
+            _unlock_badge(profile, "playmaker", match)
 
     win_streak = 0
     no_loss_streak = 0
@@ -389,18 +393,141 @@ def evaluate_badges_for_player(profile: PlayerProfile) -> None:
     for h in reversed(history):  # más antiguo -> más reciente, para rachas consecutivas reales
         win_streak = win_streak + 1 if h["result"] == "win" else 0
         if win_streak >= 3:
-            _unlock_badge(profile, "streak_3_wins")
+            _unlock_badge(profile, "streak_3_wins", match)
 
         no_loss_streak = no_loss_streak + 1 if h["result"] in ("win", "draw") else 0
         if no_loss_streak >= 5:
-            _unlock_badge(profile, "unbeaten_5")
+            _unlock_badge(profile, "unbeaten_5", match)
 
         scoring_streak = scoring_streak + 1 if h["goals"] > 0 else 0
         if scoring_streak >= 3:
-            _unlock_badge(profile, "scoring_streak_3")
+            _unlock_badge(profile, "scoring_streak_3", match)
 
     totw_entries = MatchPlayer.objects.filter(player=profile, totw_rank__isnull=False)
     if totw_entries.exists():
-        _unlock_badge(profile, "totw_first")
+        _unlock_badge(profile, "totw_first", match)
     if totw_entries.filter(totw_rank=1).exists():
-        _unlock_badge(profile, "mvp")
+        _unlock_badge(profile, "mvp", match)
+
+
+def get_pending_reveal(profile: PlayerProfile) -> dict | None:
+    """
+    Devuelve la "revelación" pendiente del jugador: el partido más reciente
+    en el que jugó, ya cerrado y con TOTJ generado, que todavía no se le ha
+    mostrado (comparado con `last_reveal_seen_match`). None si no hay nada
+    pendiente.
+    """
+    mp = (
+        MatchPlayer.objects.filter(
+            player=profile, match__is_finished=True, match__totw_generated=True
+        )
+        .exclude(match_id=profile.last_reveal_seen_match_id)
+        .select_related("match")
+        .order_by("-match__totw_generated_at", "-match__finished_at")
+        .first()
+    )
+    if not mp:
+        return None
+
+    match = mp.match
+    own_score = match.team_a_score if mp.team == "A" else match.team_b_score
+    rival_score = match.team_b_score if mp.team == "A" else match.team_a_score
+    if own_score == rival_score:
+        result = "draw"
+    elif own_score > rival_score:
+        result = "win"
+    else:
+        result = "loss"
+
+    new_badges = PlayerBadge.objects.filter(player=profile, match=match)
+
+    return {
+        "match_id": match.id,
+        "date_played": match.date_played,
+        "own_score": own_score,
+        "rival_score": rival_score,
+        "result": result,
+        "goals": mp.goals,
+        "assists": mp.assists,
+        "is_totw": mp.totw_rank is not None,
+        "totw_rank": mp.totw_rank,
+        "totw_boost": mp.totw_boost,
+        "new_badges": [
+            {
+                "code": b.code,
+                "name": BADGE_DEFINITIONS[b.code]["name"],
+                "description": BADGE_DEFINITIONS[b.code]["description"],
+            }
+            for b in new_badges
+        ],
+    }
+
+
+def get_activity_feed(request, limit: int = 30) -> list[dict]:
+    """
+    Combina, en un único feed cronológico, los eventos relevantes del grupo:
+    partidos convocados/cerrados, TOTJ generado e insignias desbloqueadas.
+    Se computa al vuelo a partir de las tablas existentes (nada se guarda por
+    separado), igual que el resto de datos derivados de la app.
+    """
+
+    def photo_url(profile):
+        if not profile.photo:
+            return ""
+        return request.build_absolute_uri(profile.photo.url) if request else profile.photo.url
+
+    events = []
+
+    for match in Match.objects.order_by("-created_at")[:limit]:
+        events.append({
+            "type": "match_created",
+            "timestamp": match.created_at,
+            "match_id": match.id,
+            "date_played": match.date_played,
+        })
+        if match.is_finished and match.finished_at:
+            events.append({
+                "type": "match_finished",
+                "timestamp": match.finished_at,
+                "match_id": match.id,
+                "date_played": match.date_played,
+                "team_a_score": match.team_a_score,
+                "team_b_score": match.team_b_score,
+            })
+        if match.totw_generated and match.totw_generated_at:
+            totw = list(
+                MatchPlayer.objects.filter(match=match, totw_rank__isnull=False)
+                .select_related("player__user")
+                .order_by("totw_rank")
+            )
+            events.append({
+                "type": "totw_generated",
+                "timestamp": match.totw_generated_at,
+                "match_id": match.id,
+                "date_played": match.date_played,
+                "totw": [
+                    {
+                        "player_id": mp.player_id,
+                        "username": mp.player.user.username,
+                        "photo_url": photo_url(mp.player),
+                        "rank": mp.totw_rank,
+                    }
+                    for mp in totw
+                ],
+            })
+
+    for badge in (
+        PlayerBadge.objects.select_related("player__user").order_by("-unlocked_at")[:limit]
+    ):
+        events.append({
+            "type": "badge_unlocked",
+            "timestamp": badge.unlocked_at,
+            "player_id": badge.player_id,
+            "username": badge.player.user.username,
+            "photo_url": photo_url(badge.player),
+            "badge_code": badge.code,
+            "badge_name": BADGE_DEFINITIONS[badge.code]["name"],
+        })
+
+    events.sort(key=lambda e: e["timestamp"], reverse=True)
+    return events[:limit]

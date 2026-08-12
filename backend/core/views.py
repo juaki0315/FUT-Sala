@@ -1,6 +1,7 @@
 from django.contrib.auth import get_user_model
 from django.db import transaction
 from django.shortcuts import get_object_or_404
+from django.utils import timezone
 from rest_framework import permissions, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -142,6 +143,15 @@ class RegisterView(APIView):
         )
 
 
+class ActivityFeedView(APIView):
+    """Feed cronológico del grupo: partidos, TOTJ generado, insignias desbloqueadas."""
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        return Response(services.get_activity_feed(request))
+
+
 class PlayerProfileViewSet(viewsets.ModelViewSet):
     queryset = PlayerProfile.objects.select_related("user").all()
     serializer_class = PlayerProfileSerializer
@@ -163,6 +173,28 @@ class PlayerProfileViewSet(viewsets.ModelViewSet):
     def me(self, request):
         profile = get_object_or_404(PlayerProfile, user=request.user)
         return Response(PlayerProfileSerializer(profile, context={"request": request}).data)
+
+    @action(detail=False, methods=["get"], url_path="me/pending_reveal")
+    def pending_reveal(self, request):
+        """
+        Revelación pendiente del jugador (resultado, TOTJ, insignias nuevas)
+        de la última jornada jugada que todavía no ha visto. None si no hay
+        nada nuevo o el usuario no tiene carta (admin).
+        """
+        profile = getattr(request.user, "profile", None)
+        if not profile:
+            return Response(None)
+        return Response(services.get_pending_reveal(profile))
+
+    @action(detail=False, methods=["post"], url_path="me/dismiss_reveal")
+    def dismiss_reveal(self, request):
+        """Marca la revelación de `match_id` como ya vista por este jugador."""
+        profile = get_object_or_404(PlayerProfile, user=request.user)
+        match_id = request.data.get("match_id")
+        if match_id:
+            profile.last_reveal_seen_match_id = match_id
+            profile.save(update_fields=["last_reveal_seen_match"])
+        return Response({"detail": "ok"})
 
     @action(detail=True, methods=["post"], permission_classes=[permissions.IsAdminUser])
     def calibrate(self, request, pk=None):
@@ -271,6 +303,7 @@ class MatchViewSet(viewsets.ModelViewSet):
         match.team_a_score = request.data.get("team_a_score")
         match.team_b_score = request.data.get("team_b_score")
         match.is_finished = True
+        match.finished_at = timezone.now()
         match.save()
         try:
             services.apply_match_result_evolution(match)
@@ -283,7 +316,7 @@ class MatchViewSet(viewsets.ModelViewSet):
             services.record_match_stats(match, stats)
 
         for mp in match.participants.select_related("player"):
-            services.evaluate_badges_for_player(mp.player)
+            services.evaluate_badges_for_player(mp.player, match=match)
 
         return Response(MatchSerializer(match, context={"request": request}).data)
 
@@ -296,7 +329,7 @@ class MatchViewSet(viewsets.ModelViewSet):
         except ValueError as e:
             return Response({"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)
         for mp in updated:
-            services.evaluate_badges_for_player(mp.player)
+            services.evaluate_badges_for_player(mp.player, match=match)
         return Response(MatchPlayerSerializer(updated, many=True, context={"request": request}).data)
 
     @action(detail=True, methods=["get"])

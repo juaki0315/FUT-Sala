@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { Analytics } from "@vercel/analytics/react";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import ErrorBoundary from "./components/ErrorBoundary";
+import RevealModal from "./components/RevealModal";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import HomePage from "./pages/HomePage";
@@ -127,12 +128,18 @@ function AppRoutes() {
   );
 }
 
+function RevealGate() {
+  const { pendingReveal, dismissPendingReveal } = useAuth();
+  return <RevealModal reveal={pendingReveal} onClose={dismissPendingReveal} />;
+}
+
 export default function App() {
   return (
     <ErrorBoundary>
       <AuthProvider>
         <BrowserRouter>
           <AppRoutes />
+          <RevealGate />
         </BrowserRouter>
       </AuthProvider>
       <Analytics />

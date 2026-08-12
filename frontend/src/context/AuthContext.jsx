@@ -9,11 +9,33 @@ export function AuthProvider({ children }) {
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [ready, setReady] = useState(false);
+  const [pendingReveal, setPendingReveal] = useState(null);
+
+  const checkPendingReveal = async () => {
+    try {
+      const res = await api.pendingReveal();
+      setPendingReveal(res.data);
+    } catch {
+      setPendingReveal(null);
+    }
+  };
+
+  const dismissPendingReveal = async () => {
+    if (!pendingReveal) return;
+    const matchId = pendingReveal.match_id;
+    setPendingReveal(null);
+    try {
+      await api.dismissReveal(matchId);
+    } catch {
+      // Si falla, se le volverá a mostrar en la próxima apertura de la app.
+    }
+  };
 
   const reloadProfile = async () => {
     try {
       const res = await api.myProfile();
       setProfile(res.data);
+      checkPendingReveal();
     } catch {
       setProfile(null);
     }
@@ -78,6 +100,7 @@ export function AuthProvider({ children }) {
     localStorage.removeItem("fs_refresh");
     setUser(null);
     setProfile(null);
+    setPendingReveal(null);
   };
 
   return (
@@ -93,6 +116,8 @@ export function AuthProvider({ children }) {
         register,
         logout,
         refreshProfile: reloadProfile,
+        pendingReveal,
+        dismissPendingReveal,
       }}
     >
       {children}
