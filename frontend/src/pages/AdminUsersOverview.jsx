@@ -118,7 +118,7 @@ export default function AdminUsersOverview() {
           </div>
         ) : (
           users.map((u) => (
-            <div key={u.id} className="rounded-2xl bg-pitch-850 border border-pitch-700 p-4">
+            <div key={u.id} className="surface rounded-2xl p-4">
               <div className="flex items-center gap-3">
                 <div className="h-11 w-11 rounded-full bg-floodlight-500/10 flex items-center justify-center text-floodlight-400 font-display text-lg overflow-hidden shrink-0">
                   {u.photo_url ? (

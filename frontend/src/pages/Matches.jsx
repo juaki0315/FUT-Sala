@@ -82,7 +82,7 @@ export default function Matches() {
             >
               <Link
                 to={`/partidos/${m.id}`}
-                className="flex items-center gap-3 rounded-xl bg-pitch-850 border border-pitch-700 px-4 py-3 hover:border-gold-500/40 transition-colors"
+                className="surface surface-interactive flex items-center gap-3 rounded-xl px-4 py-3 hover:border-gold-500/40"
               >
                 <div
                   className={`h-9 w-9 rounded-lg flex items-center justify-center ${

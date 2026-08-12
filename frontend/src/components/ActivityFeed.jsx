@@ -21,7 +21,7 @@ function FeedItem({ event }) {
     return (
       <Link
         to={`/partidos/${event.match_id}`}
-        className="flex items-center gap-3 rounded-xl bg-pitch-850 border border-pitch-700 px-3.5 py-3 hover:border-gold-500/40 transition-colors"
+        className="surface surface-interactive flex items-center gap-3 rounded-xl px-3.5 py-3 hover:border-gold-500/40"
       >
         <div className="h-9 w-9 shrink-0 rounded-lg bg-floodlight-500/10 flex items-center justify-center text-floodlight-400">
           <CalendarPlus size={16} />
@@ -41,7 +41,7 @@ function FeedItem({ event }) {
     return (
       <Link
         to={`/partidos/${event.match_id}`}
-        className="flex items-center gap-3 rounded-xl bg-pitch-850 border border-pitch-700 px-3.5 py-3 hover:border-gold-500/40 transition-colors"
+        className="surface surface-interactive flex items-center gap-3 rounded-xl px-3.5 py-3 hover:border-gold-500/40"
       >
         <div className="h-9 w-9 shrink-0 rounded-lg bg-gold-500/15 flex items-center justify-center text-gold-400">
           <Flag size={16} />
@@ -87,7 +87,7 @@ function FeedItem({ event }) {
     return (
       <Link
         to={`/jugadores/${event.player_id}`}
-        className="flex items-center gap-3 rounded-xl bg-pitch-850 border border-pitch-700 px-3.5 py-3 hover:border-gold-500/40 transition-colors"
+        className="surface surface-interactive flex items-center gap-3 rounded-xl px-3.5 py-3 hover:border-gold-500/40"
       >
         <div className="h-9 w-9 shrink-0 rounded-full bg-pitch-900 border border-gold-500/60 overflow-hidden flex items-center justify-center text-floodlight-200 font-display text-sm">
           {event.photo_url ? (

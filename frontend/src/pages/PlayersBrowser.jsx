@@ -62,7 +62,7 @@ export default function PlayersBrowser() {
             <Link
               key={p.id}
               to={`/jugadores/${p.id}`}
-              className="flex items-center gap-3 rounded-xl bg-pitch-850 border border-pitch-700 px-4 py-3 hover:border-gold-500/40 transition-colors"
+              className="surface surface-interactive flex items-center gap-3 rounded-xl px-4 py-3 hover:border-gold-500/40"
             >
               <div className="h-11 w-11 rounded-full bg-floodlight-500/10 flex items-center justify-center text-floodlight-400 font-display text-lg overflow-hidden shrink-0">
                 {p.photo_url ? (

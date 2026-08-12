@@ -108,7 +108,7 @@ export default function HomePage() {
           ) : upcoming ? (
             <Link
               to="/partidos"
-              className="block rounded-2xl bg-pitch-850 border border-pitch-700 p-4 hover:border-gold-500/50 transition-colors"
+              className="surface surface-interactive block rounded-2xl p-4 hover:border-gold-500/50"
             >
               <div className="flex items-center gap-3">
                 <div className="h-11 w-11 rounded-xl bg-floodlight-500/10 flex items-center justify-center text-floodlight-400">

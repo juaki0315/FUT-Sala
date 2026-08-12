@@ -10,7 +10,7 @@ const ITEMS = [
 
 export default function BottomNav() {
   return (
-    <nav className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-md border-t border-pitch-700 bg-pitch-900/95 backdrop-blur pb-[env(safe-area-inset-bottom)] z-40">
+    <nav className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-md border-t border-pitch-700 bg-pitch-900/95 backdrop-blur pb-[env(safe-area-inset-bottom)] z-40 shadow-[0_-12px_24px_-16px_rgba(0,0,0,0.7)]">
       <div className="flex">
         {ITEMS.map(({ to, label, icon: Icon, end }) => (
           <NavLink
@@ -18,15 +18,18 @@ export default function BottomNav() {
             to={to}
             end={end}
             className={({ isActive }) =>
-              `flex-1 flex flex-col items-center gap-1 py-2.5 text-[11px] font-medium transition-colors ${
+              `relative flex-1 flex flex-col items-center gap-1 py-2.5 text-[11px] font-medium transition-colors ${
                 isActive ? "text-gold-400" : "text-floodlight-300/50 hover:text-floodlight-300/80"
               }`
             }
           >
             {({ isActive }) => (
               <>
-                <Icon size={20} strokeWidth={isActive ? 2.4 : 1.8} />
-                {label}
+                {isActive && (
+                  <span className="absolute top-0.5 h-9 w-14 rounded-full bg-gold-500/20 blur-lg" />
+                )}
+                <Icon size={20} strokeWidth={isActive ? 2.4 : 1.8} className="relative" />
+                <span className="relative">{label}</span>
               </>
             )}
           </NavLink>

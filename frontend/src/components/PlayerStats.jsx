@@ -2,7 +2,7 @@ import { Swords, Trophy, Goal, Footprints, Star } from "lucide-react";
 
 function StatTile({ icon: Icon, label, value }) {
   return (
-    <div className="rounded-xl bg-pitch-850 border border-pitch-700 p-3 flex flex-col items-center gap-1">
+    <div className="surface rounded-xl p-3 flex flex-col items-center gap-1">
       <Icon size={15} className="text-gold-400" />
       <span className="font-display text-2xl text-floodlight-300 leading-none">{value}</span>
       <span className="text-[10px] uppercase tracking-wide text-floodlight-300/50">{label}</span>

@@ -7,6 +7,7 @@
   --color-pitch-850: #121c17;
   --color-pitch-800: #172420;
   --color-pitch-700: #24352e;
+  --color-pitch-650: #2c4038;
   --color-pitch-600: #3a4f45;
 
   --color-gold-300: #fce49c;
@@ -43,10 +44,12 @@ body {
   overscroll-behavior-y: none;
 }
 
-/* Textura sutil de césped/turf en el fondo */
+/* Textura sutil de césped/turf en el fondo, más un halo cálido superior para
+   que la pantalla no se sienta plana ni completamente negra. */
 .pitch-texture {
   background-image:
-    radial-gradient(circle at 20% 10%, rgba(111, 211, 245, 0.08), transparent 40%),
+    radial-gradient(circle at 50% -10%, rgba(232, 185, 62, 0.12), transparent 45%),
+    radial-gradient(circle at 20% 10%, rgba(111, 211, 245, 0.1), transparent 40%),
     repeating-linear-gradient(
       0deg,
       rgba(255, 255, 255, 0.015) 0px,
@@ -54,6 +57,51 @@ body {
       transparent 1px,
       transparent 22px
     );
+}
+
+/* Tarjeta "elevada": sustituye al patrón plano bg-pitch-850 + border, dando
+   algo de profundidad real (gradiente + sombra) sin cambiar el layout. */
+.surface {
+  background: linear-gradient(165deg, var(--color-pitch-600) 0%, var(--color-pitch-850) 60%);
+  border: 1px solid var(--color-pitch-600);
+  box-shadow:
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.08),
+    0 16px 32px -14px rgba(0, 0, 0, 0.85);
+}
+
+.surface-interactive {
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.1s ease;
+}
+.surface-interactive:hover {
+  border-color: var(--color-gold-600);
+  box-shadow:
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.08),
+    0 16px 32px -14px rgba(0, 0, 0, 0.85),
+    0 0 0 1px rgba(232, 185, 62, 0.15);
+}
+.surface-interactive:active {
+  transform: scale(0.98);
+}
+
+/* Halos de color para insignias/iconos destacados: dan sensación de "premium"
+   en vez del simple relleno translúcido plano que había antes. */
+.glow-gold {
+  box-shadow: 0 8px 20px -6px rgba(232, 185, 62, 0.55);
+}
+.glow-floodlight {
+  box-shadow: 0 8px 20px -6px rgba(111, 211, 245, 0.4);
+}
+.glow-totw {
+  box-shadow: 0 8px 20px -6px rgba(124, 29, 111, 0.55);
+}
+
+/* Título con degradado sutil dorado -> blanco, para dar más presencia a los
+   encabezados de página sin depender solo del tamaño de fuente. */
+.title-gradient {
+  background: linear-gradient(90deg, var(--color-floodlight-300) 55%, var(--color-gold-300) 130%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
 }
 
 .font-display {

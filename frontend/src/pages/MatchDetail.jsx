@@ -21,7 +21,7 @@ function ConvocadosList({ participants }) {
         <Link
           key={mp.id}
           to={`/jugadores/${mp.player}`}
-          className="flex items-center gap-2 rounded-xl bg-pitch-850 border border-pitch-700 px-3 py-2 hover:border-gold-500/40 transition-colors"
+          className="surface surface-interactive flex items-center gap-2 rounded-xl px-3 py-2 hover:border-gold-500/40"
         >
           <div className="h-8 w-8 shrink-0 rounded-full bg-pitch-900 border border-gold-500/60 overflow-hidden flex items-center justify-center text-floodlight-200 font-display text-sm">
             {mp.player_detail?.photo_url ? (
@@ -304,7 +304,7 @@ export default function MatchDetail() {
             </h2>
             <form onSubmit={finish} className="space-y-4">
               {match.participants.length > 0 && (
-                <div className="rounded-xl bg-pitch-850 border border-pitch-700 p-3">
+                <div className="surface rounded-xl p-3">
                   <div className="text-xs font-semibold text-floodlight-300/50 mb-2">Asignar equipos</div>
                   <div className="space-y-2">
                     {match.participants.map((mp) => {
@@ -366,7 +366,7 @@ export default function MatchDetail() {
               </div>
 
               {match.participants.length > 0 && (
-                <div className="rounded-xl bg-pitch-850 border border-pitch-700 p-3">
+                <div className="surface rounded-xl p-3">
                   <div className="text-xs font-semibold text-floodlight-300/50 mb-2 flex items-center gap-1.5">
                     <Goal size={13} /> Goles y asistencias (opcional)
                   </div>
@@ -424,7 +424,7 @@ export default function MatchDetail() {
             <h2 className="text-xs font-semibold uppercase tracking-widest text-floodlight-300/50 mb-3 flex items-center gap-1.5">
               <BarChart3 size={13} /> Estado de la votación
             </h2>
-            <div className="rounded-xl bg-pitch-850 border border-pitch-700 p-3">
+            <div className="surface rounded-xl p-3">
               <div className="text-xs text-floodlight-300/50 mb-2">
                 {distinctVoters} persona{distinctVoters === 1 ? "" : "s"} han votado ·{" "}
                 {allVotes.length} voto{allVotes.length === 1 ? "" : "s"} en total
@@ -467,7 +467,7 @@ export default function MatchDetail() {
             </h2>
 
             {myVotes ? (
-              <div className="rounded-xl bg-pitch-850 border border-pitch-700 p-3 space-y-1.5">
+              <div className="surface rounded-xl p-3 space-y-1.5">
                 <div className="text-xs text-floodlight-300/50 mb-1">
                   Ya has votado en este partido. Los votos no se pueden editar.
                 </div>

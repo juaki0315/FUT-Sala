@@ -34,7 +34,7 @@ export default function MatchHistoryList({ history }) {
             <Link
               key={h.match_id}
               to={`/partidos/${h.match_id}`}
-              className="flex items-center gap-3 rounded-xl bg-pitch-850 border border-pitch-700 px-3.5 py-2.5 hover:border-gold-500/40 transition-colors"
+              className="surface surface-interactive flex items-center gap-3 rounded-xl px-3.5 py-2.5 hover:border-gold-500/40"
             >
               <span
                 className={`h-6 w-6 shrink-0 rounded-full flex items-center justify-center font-display text-xs font-bold ${r.className}`}
