@@ -208,6 +208,43 @@ def get_player_stats(profile: PlayerProfile) -> dict:
     }
 
 
+def get_player_match_history(profile: PlayerProfile) -> list[dict]:
+    """
+    Historial partido a partido de un jugador: fecha, resultado desde su
+    perspectiva, si ganó/empató/perdió, y sus goles/asistencias ese día.
+    Más reciente primero.
+    """
+    history = (
+        MatchPlayer.objects.filter(player=profile, match__is_finished=True)
+        .select_related("match")
+        .order_by("-match__date_played")
+    )
+    entries = []
+    for mp in history:
+        match = mp.match
+        if match.team_a_score is None or match.team_b_score is None:
+            continue
+        own_score = match.team_a_score if mp.team == "A" else match.team_b_score
+        rival_score = match.team_b_score if mp.team == "A" else match.team_a_score
+        if own_score == rival_score:
+            result = "draw"
+        elif own_score > rival_score:
+            result = "win"
+        else:
+            result = "loss"
+        entries.append({
+            "match_id": match.id,
+            "date_played": match.date_played,
+            "own_score": own_score,
+            "rival_score": rival_score,
+            "result": result,
+            "is_totw": mp.is_totw,
+            "goals": mp.goals,
+            "assists": mp.assists,
+        })
+    return entries
+
+
 @transaction.atomic
 def generate_totw(match) -> list[MatchPlayer]:
     """

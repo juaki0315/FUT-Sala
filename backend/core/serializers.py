@@ -65,6 +65,7 @@ class PlayerProfileSerializer(serializers.ModelSerializer):
     photo = serializers.ImageField(write_only=True, required=False, allow_null=True)
     photo_url = serializers.SerializerMethodField()
     stats = serializers.SerializerMethodField()
+    match_history = serializers.SerializerMethodField()
 
     class Meta:
         model = PlayerProfile
@@ -74,7 +75,7 @@ class PlayerProfileSerializer(serializers.ModelSerializer):
             "pierna_mala", "filigranas", "calibrated",
             "overall_rating", "current_card_rating", "is_totw_active",
             "initial_votes_count", "assigned_voters_count", "assigned_voter_ids",
-            "preview_rating", "stats",
+            "preview_rating", "stats", "match_history",
         ]
         read_only_fields = ["user", "calibrated"]
 
@@ -112,6 +113,9 @@ class PlayerProfileSerializer(serializers.ModelSerializer):
 
     def get_stats(self, obj):
         return services.get_player_stats(obj)
+
+    def get_match_history(self, obj):
+        return services.get_player_match_history(obj)
 
 
 class EvaluatorAssignmentSerializer(serializers.ModelSerializer):
