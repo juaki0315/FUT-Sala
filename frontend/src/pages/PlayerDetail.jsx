@@ -4,6 +4,7 @@ import { ArrowLeft } from "lucide-react";
 import Layout from "../components/Layout";
 import PlayerCard from "../components/PlayerCard";
 import PlayerStats from "../components/PlayerStats";
+import PlayerBadges from "../components/PlayerBadges";
 import MatchHistoryList from "../components/MatchHistoryList";
 import { api } from "../api/endpoints";
 
@@ -57,6 +58,9 @@ export default function PlayerDetail() {
             )}
             <div className="mt-6 w-full">
               <PlayerStats stats={player.stats} />
+            </div>
+            <div className="mt-6 w-full">
+              <PlayerBadges badges={player.badges} />
             </div>
             <div className="mt-6 w-full">
               <MatchHistoryList history={player.match_history} />

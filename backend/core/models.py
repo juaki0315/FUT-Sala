@@ -104,6 +104,21 @@ class MatchPlayer(models.Model):
         return f"{self.player.user.username} - {self.match} ({self.team})"
 
 
+class PlayerBadge(models.Model):
+    """Insignia desbloqueada de forma permanente por un jugador."""
+
+    player = models.ForeignKey(PlayerProfile, on_delete=models.CASCADE, related_name="badges")
+    code = models.CharField(max_length=40)
+    unlocked_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ("player", "code")
+        ordering = ["-unlocked_at"]
+
+    def __str__(self):
+        return f"{self.player.user.username} - {self.code}"
+
+
 class InitialVote(models.Model):
     """Voto de calibración inicial para un jugador nuevo."""
 

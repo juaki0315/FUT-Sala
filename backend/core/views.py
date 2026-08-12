@@ -256,6 +256,9 @@ class MatchViewSet(viewsets.ModelViewSet):
         if stats:
             services.record_match_stats(match, stats)
 
+        for mp in match.participants.select_related("player"):
+            services.evaluate_badges_for_player(mp.player)
+
         return Response(MatchSerializer(match, context={"request": request}).data)
 
     @action(detail=True, methods=["post"])
@@ -266,6 +269,8 @@ class MatchViewSet(viewsets.ModelViewSet):
             updated = services.generate_totw(match)
         except ValueError as e:
             return Response({"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        for mp in updated:
+            services.evaluate_badges_for_player(mp.player)
         return Response(MatchPlayerSerializer(updated, many=True, context={"request": request}).data)
 
     @action(detail=True, methods=["get"])

@@ -2,7 +2,15 @@ from django.contrib.auth import get_user_model
 from rest_framework import serializers
 
 from . import services
-from .models import EvaluatorAssignment, InitialVote, Match, MatchPlayer, MatchVote, PlayerProfile
+from .models import (
+    EvaluatorAssignment,
+    InitialVote,
+    Match,
+    MatchPlayer,
+    MatchVote,
+    PlayerBadge,
+    PlayerProfile,
+)
 
 User = get_user_model()
 
@@ -52,6 +60,21 @@ class UserRegisterSerializer(serializers.ModelSerializer):
         return user
 
 
+class PlayerBadgeSerializer(serializers.ModelSerializer):
+    name = serializers.SerializerMethodField()
+    description = serializers.SerializerMethodField()
+
+    class Meta:
+        model = PlayerBadge
+        fields = ["code", "name", "description", "unlocked_at"]
+
+    def get_name(self, obj):
+        return services.BADGE_DEFINITIONS[obj.code]["name"]
+
+    def get_description(self, obj):
+        return services.BADGE_DEFINITIONS[obj.code]["description"]
+
+
 class PlayerProfileSerializer(serializers.ModelSerializer):
     user = UserSerializer(read_only=True)
     username = serializers.CharField(source="user.username", read_only=True)
@@ -66,6 +89,7 @@ class PlayerProfileSerializer(serializers.ModelSerializer):
     photo_url = serializers.SerializerMethodField()
     stats = serializers.SerializerMethodField()
     match_history = serializers.SerializerMethodField()
+    badges = PlayerBadgeSerializer(many=True, read_only=True)
 
     class Meta:
         model = PlayerProfile
@@ -75,7 +99,7 @@ class PlayerProfileSerializer(serializers.ModelSerializer):
             "pierna_mala", "filigranas", "calibrated",
             "overall_rating", "current_card_rating", "is_totw_active",
             "initial_votes_count", "assigned_voters_count", "assigned_voter_ids",
-            "preview_rating", "stats", "match_history",
+            "preview_rating", "stats", "match_history", "badges",
         ]
         read_only_fields = ["user", "calibrated"]
 

@@ -5,6 +5,7 @@ import Layout from "../components/Layout";
 import PageHeader from "../components/PageHeader";
 import PlayerCard from "../components/PlayerCard";
 import PlayerStats from "../components/PlayerStats";
+import PlayerBadges from "../components/PlayerBadges";
 import MatchHistoryList from "../components/MatchHistoryList";
 import { api } from "../api/endpoints";
 import { useAuth } from "../context/AuthContext";
@@ -84,6 +85,10 @@ export default function MyCard() {
 
         <div className="w-full mt-8">
           <PlayerStats stats={profile.stats} />
+        </div>
+
+        <div className="w-full mt-6">
+          <PlayerBadges badges={profile.badges} />
         </div>
 
         <div className="w-full mt-6">

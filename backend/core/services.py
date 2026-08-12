@@ -9,7 +9,7 @@ from decimal import Decimal, ROUND_HALF_UP
 
 from django.db import transaction
 
-from .models import InitialVote, MatchPlayer, MatchVote, PlayerProfile
+from .models import InitialVote, MatchPlayer, MatchVote, PlayerBadge, PlayerProfile
 
 ATTR_FIELDS = ["ritmo", "tiro", "pase", "regate", "defensa", "fisico"]
 STAR_FIELDS = ["pierna_mala", "filigranas"]
@@ -198,6 +198,7 @@ def get_player_stats(profile: PlayerProfile) -> dict:
             losses += 1
         goals += mp.goals
         assists += mp.assists
+    totw_count = MatchPlayer.objects.filter(player=profile, totw_rank__isnull=False).count()
     return {
         "matches_played": len(history),
         "wins": wins,
@@ -205,6 +206,7 @@ def get_player_stats(profile: PlayerProfile) -> dict:
         "draws": draws,
         "goals": goals,
         "assists": assists,
+        "totw_count": totw_count,
     }
 
 
@@ -294,8 +296,111 @@ def expire_previous_totw() -> int:
     """
     La carta TOTJ caduca automáticamente al crearse el siguiente partido.
     Se llama al crear un nuevo Match. Devuelve el nº de cartas expiradas.
+    Solo se desactiva `is_totw` (lo único que afecta al boost visual/temporal
+    vigente); `totw_boost` y `totw_rank` se conservan como registro histórico
+    para poder contar apariciones pasadas en el TOTJ (insignias, estadísticas).
     """
     qs = MatchPlayer.objects.filter(is_totw=True)
     count = qs.count()
-    qs.update(is_totw=False, totw_boost=0, totw_rank=None)
+    qs.update(is_totw=False)
     return count
+
+
+BADGE_DEFINITIONS = {
+    "hat_trick": {
+        "name": "Hat-trick",
+        "description": "Marcó 3 o más goles en un partido.",
+    },
+    "manita": {
+        "name": "Manita",
+        "description": "Marcó 5 o más goles en un partido.",
+    },
+    "playmaker": {
+        "name": "Asistente",
+        "description": "Dio 3 o más asistencias en un partido.",
+    },
+    "streak_3_wins": {
+        "name": "Racha ganadora",
+        "description": "3 victorias seguidas.",
+    },
+    "unbeaten_5": {
+        "name": "Invicto",
+        "description": "5 partidos seguidos sin perder.",
+    },
+    "scoring_streak_3": {
+        "name": "Racha goleadora",
+        "description": "Marcó en 3 partidos seguidos.",
+    },
+    "matches_3": {
+        "name": "Debutante",
+        "description": "3 partidos disputados.",
+    },
+    "matches_6": {
+        "name": "Habitual",
+        "description": "6 partidos disputados.",
+    },
+    "matches_10": {
+        "name": "Veterano",
+        "description": "10 partidos disputados.",
+    },
+    "totw_first": {
+        "name": "Convocado",
+        "description": "Primera convocatoria al Equipo de la Jornada.",
+    },
+    "mvp": {
+        "name": "MVP",
+        "description": "Fue el jugador más votado de una jornada.",
+    },
+}
+
+
+def _unlock_badge(profile: PlayerProfile, code: str) -> None:
+    PlayerBadge.objects.get_or_create(player=profile, code=code)
+
+
+def evaluate_badges_for_player(profile: PlayerProfile) -> None:
+    """
+    Recalcula todas las condiciones de insignias a partir del estado actual
+    del jugador y desbloquea (de forma permanente e idempotente) las que
+    correspondan. Las insignias ya desbloqueadas nunca se revocan, aunque la
+    racha que las originó se rompa más adelante.
+    """
+    history = get_player_match_history(profile)  # más reciente primero
+    matches_played = len(history)
+
+    if matches_played >= 3:
+        _unlock_badge(profile, "matches_3")
+    if matches_played >= 6:
+        _unlock_badge(profile, "matches_6")
+    if matches_played >= 10:
+        _unlock_badge(profile, "matches_10")
+
+    for h in history:
+        if h["goals"] >= 3:
+            _unlock_badge(profile, "hat_trick")
+        if h["goals"] >= 5:
+            _unlock_badge(profile, "manita")
+        if h["assists"] >= 3:
+            _unlock_badge(profile, "playmaker")
+
+    win_streak = 0
+    no_loss_streak = 0
+    scoring_streak = 0
+    for h in reversed(history):  # más antiguo -> más reciente, para rachas consecutivas reales
+        win_streak = win_streak + 1 if h["result"] == "win" else 0
+        if win_streak >= 3:
+            _unlock_badge(profile, "streak_3_wins")
+
+        no_loss_streak = no_loss_streak + 1 if h["result"] in ("win", "draw") else 0
+        if no_loss_streak >= 5:
+            _unlock_badge(profile, "unbeaten_5")
+
+        scoring_streak = scoring_streak + 1 if h["goals"] > 0 else 0
+        if scoring_streak >= 3:
+            _unlock_badge(profile, "scoring_streak_3")
+
+    totw_entries = MatchPlayer.objects.filter(player=profile, totw_rank__isnull=False)
+    if totw_entries.exists():
+        _unlock_badge(profile, "totw_first")
+    if totw_entries.filter(totw_rank=1).exists():
+        _unlock_badge(profile, "mvp")

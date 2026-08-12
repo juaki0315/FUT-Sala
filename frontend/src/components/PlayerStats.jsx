@@ -1,4 +1,4 @@
-import { Swords, Trophy, Goal, Footprints } from "lucide-react";
+import { Swords, Trophy, Goal, Footprints, Star } from "lucide-react";
 
 function StatTile({ icon: Icon, label, value }) {
   return (
@@ -19,13 +19,14 @@ export default function PlayerStats({ stats }) {
       <h2 className="text-xs font-semibold uppercase tracking-widest text-floodlight-300/50 mb-3">
         Estadísticas
       </h2>
-      <div className="grid grid-cols-4 gap-2">
+      <div className="grid grid-cols-3 gap-2">
         <StatTile icon={Swords} label="Partidos" value={stats.matches_played} />
         <StatTile
           icon={Trophy}
           label="V-E-D"
           value={`${stats.wins}-${stats.draws}-${stats.losses}`}
         />
+        <StatTile icon={Star} label="TOTJ" value={stats.totw_count} />
         <StatTile icon={Goal} label="Goles" value={stats.goals} />
         <StatTile icon={Footprints} label="Asist." value={stats.assists} />
       </div>
