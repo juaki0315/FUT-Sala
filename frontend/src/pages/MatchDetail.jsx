@@ -1,11 +1,41 @@
 import { Fragment, useEffect, useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, Link } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { ArrowLeft, Users, Trophy, Vote, Flag, BarChart3, Goal, Trash2 } from "lucide-react";
 import Layout from "../components/Layout";
 import PitchLineup from "../components/PitchLineup";
 import { api } from "../api/endpoints";
 import { useAuth } from "../context/AuthContext";
+
+function ConvocadosList({ participants }) {
+  if (participants.length === 0) {
+    return (
+      <div className="rounded-xl border border-dashed border-pitch-700 p-5 text-center text-sm text-floodlight-300/40">
+        Todavía no hay convocados.
+      </div>
+    );
+  }
+  return (
+    <div className="flex flex-wrap gap-2">
+      {participants.map((mp) => (
+        <Link
+          key={mp.id}
+          to={`/jugadores/${mp.player}`}
+          className="flex items-center gap-2 rounded-xl bg-pitch-850 border border-pitch-700 px-3 py-2 hover:border-gold-500/40 transition-colors"
+        >
+          <div className="h-8 w-8 shrink-0 rounded-full bg-pitch-900 border border-gold-500/60 overflow-hidden flex items-center justify-center text-floodlight-200 font-display text-sm">
+            {mp.player_detail?.photo_url ? (
+              <img src={mp.player_detail.photo_url} alt="" className="h-full w-full object-cover" />
+            ) : (
+              mp.player_detail?.username?.[0]?.toUpperCase() ?? "?"
+            )}
+          </div>
+          <span className="text-sm text-floodlight-300">{mp.player_detail?.username}</span>
+        </Link>
+      ))}
+    </div>
+  );
+}
 
 export default function MatchDetail() {
   const { id } = useParams();
@@ -25,6 +55,7 @@ export default function MatchDetail() {
   const [allVotes, setAllVotes] = useState([]);
   const [votingSaving, setVotingSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [teamAssignments, setTeamAssignments] = useState({});
 
   const isAdmin = user?.is_staff;
 
@@ -51,9 +82,13 @@ export default function MatchDetail() {
     (p) => !match?.participants.some((mp) => mp.player === p.id)
   );
 
-  const assign = async (playerId, team) => {
-    await api.addPlayersToMatch(id, [{ player: playerId, team }]);
+  const callUp = async (playerId) => {
+    await api.addPlayersToMatch(id, [{ player: playerId }]);
     load();
+  };
+
+  const setTeam = (playerId, team) => {
+    setTeamAssignments((prev) => ({ ...prev, [playerId]: team }));
   };
 
   const setStat = (playerId, field, value) => {
@@ -63,16 +98,29 @@ export default function MatchDetail() {
     }));
   };
 
+  const allTeamsAssigned =
+    match?.participants.length > 0 &&
+    match.participants.every((mp) => mp.team || teamAssignments[mp.player]);
+
   const finish = async (e) => {
     e.preventDefault();
     setError("");
     try {
+      const teams = match.participants.map((mp) => ({
+        player: mp.player,
+        team: mp.team || teamAssignments[mp.player],
+      }));
       const stats = match.participants.map((mp) => ({
         player: mp.player,
         goals: Number(playerStats[mp.player]?.goals || 0),
         assists: Number(playerStats[mp.player]?.assists || 0),
       }));
-      await api.finishMatch(id, { team_a_score: Number(scoreA), team_b_score: Number(scoreB), stats });
+      await api.finishMatch(id, {
+        team_a_score: Number(scoreA),
+        team_b_score: Number(scoreB),
+        teams,
+        stats,
+      });
       setMsg("Partido cerrado y medias actualizadas.");
       load();
     } catch (err) {
@@ -217,34 +265,30 @@ export default function MatchDetail() {
           </div>
         )}
 
-        {/* Alineaciones */}
+        {/* Convocados / Alineaciones */}
         <section>
           <h2 className="text-xs font-semibold uppercase tracking-widest text-floodlight-300/50 mb-3 flex items-center gap-1.5">
-            <Users size={13} /> Alineaciones
+            <Users size={13} /> {match.is_finished ? "Alineaciones" : "Convocados"}
           </h2>
-          <PitchLineup teamA={teamA} teamB={teamB} />
+          {match.is_finished ? (
+            <PitchLineup teamA={teamA} teamB={teamB} />
+          ) : (
+            <ConvocadosList participants={match.participants} />
+          )}
 
           {isAdmin && !match.is_finished && unassigned.length > 0 && (
             <div className="mt-3 rounded-xl bg-pitch-850 border border-dashed border-pitch-700 p-3">
-              <div className="text-xs font-semibold text-floodlight-300/50 mb-2">Añadir jugador</div>
+              <div className="text-xs font-semibold text-floodlight-300/50 mb-2">Convocar jugador</div>
               <div className="space-y-2">
                 {unassigned.map((p) => (
                   <div key={p.id} className="flex items-center justify-between gap-2">
                     <span className="text-sm text-floodlight-300 truncate">{p.username}</span>
-                    <div className="flex gap-1.5">
-                      <button
-                        onClick={() => assign(p.id, "A")}
-                        className="rounded-lg bg-pitch-800 px-2.5 py-1 text-xs font-semibold text-floodlight-300/70 hover:text-gold-400"
-                      >
-                        Equipo A
-                      </button>
-                      <button
-                        onClick={() => assign(p.id, "B")}
-                        className="rounded-lg bg-pitch-800 px-2.5 py-1 text-xs font-semibold text-floodlight-300/70 hover:text-gold-400"
-                      >
-                        Equipo B
-                      </button>
-                    </div>
+                    <button
+                      onClick={() => callUp(p.id)}
+                      className="rounded-lg bg-pitch-800 px-3 py-1.5 text-xs font-semibold text-floodlight-300/70 hover:text-gold-400"
+                    >
+                      Convocar
+                    </button>
                   </div>
                 ))}
               </div>
@@ -259,6 +303,48 @@ export default function MatchDetail() {
               <Flag size={13} /> Cerrar partido
             </h2>
             <form onSubmit={finish} className="space-y-4">
+              {match.participants.length > 0 && (
+                <div className="rounded-xl bg-pitch-850 border border-pitch-700 p-3">
+                  <div className="text-xs font-semibold text-floodlight-300/50 mb-2">Asignar equipos</div>
+                  <div className="space-y-2">
+                    {match.participants.map((mp) => {
+                      const current = mp.team || teamAssignments[mp.player];
+                      return (
+                        <div key={mp.id} className="flex items-center justify-between gap-2">
+                          <span className="text-sm text-floodlight-300 truncate">
+                            {mp.player_detail?.username}
+                          </span>
+                          <div className="flex gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => setTeam(mp.player, "A")}
+                              className={`rounded-lg px-2.5 py-1 text-xs font-semibold ${
+                                current === "A"
+                                  ? "bg-gold-500 text-pitch-900"
+                                  : "bg-pitch-800 text-floodlight-300/70 hover:text-gold-400"
+                              }`}
+                            >
+                              Equipo A
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setTeam(mp.player, "B")}
+                              className={`rounded-lg px-2.5 py-1 text-xs font-semibold ${
+                                current === "B"
+                                  ? "bg-gold-500 text-pitch-900"
+                                  : "bg-pitch-800 text-floodlight-300/70 hover:text-gold-400"
+                              }`}
+                            >
+                              Equipo B
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
               <div className="flex items-center gap-2">
                 <input
                   type="number"
@@ -317,9 +403,17 @@ export default function MatchDetail() {
                 </div>
               )}
 
-              <button className="w-full rounded-xl bg-gold-500 py-2.5 text-sm font-semibold text-pitch-900">
+              <button
+                disabled={!allTeamsAssigned}
+                className="w-full rounded-xl bg-gold-500 py-2.5 text-sm font-semibold text-pitch-900 disabled:opacity-40"
+              >
                 Finalizar partido
               </button>
+              {!allTeamsAssigned && (
+                <p className="text-[11px] text-floodlight-300/40 text-center">
+                  Asigna un equipo a todos los convocados para poder cerrar el partido.
+                </p>
+              )}
             </form>
           </section>
         )}

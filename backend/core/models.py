@@ -90,7 +90,9 @@ class MatchPlayer(models.Model):
 
     match = models.ForeignKey(Match, on_delete=models.CASCADE, related_name="participants")
     player = models.ForeignKey(PlayerProfile, on_delete=models.CASCADE, related_name="match_history")
-    team = models.CharField(max_length=1, choices=TEAM_CHOICES)
+    # Nulo mientras el jugador está solo convocado: el admin asigna equipo
+    # al cerrar el partido, junto con el resultado.
+    team = models.CharField(max_length=1, choices=TEAM_CHOICES, null=True, blank=True)
     is_totw = models.BooleanField(default=False)  # Equipo de la Jornada
     totw_boost = models.PositiveSmallIntegerField(default=0)
     totw_rank = models.PositiveSmallIntegerField(null=True, blank=True)  # 1..5

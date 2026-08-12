@@ -219,13 +219,17 @@ class MatchViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=["post"])
     def add_players(self, request, pk=None):
-        """Admin: asigna jugadores a Equipo A / Equipo B. Body: [{player, team}, ...]"""
+        """
+        Admin: convoca jugadores al partido. Body: [{player, team}, ...]
+        `team` es opcional: se puede convocar sin decidir equipos todavía y
+        asignarlos más tarde al cerrar el partido (ver `finish`).
+        """
         match = self.get_object()
         entries = request.data if isinstance(request.data, list) else request.data.get("players", [])
         created = []
         for entry in entries:
             mp, _ = MatchPlayer.objects.update_or_create(
-                match=match, player_id=entry["player"], defaults={"team": entry["team"]}
+                match=match, player_id=entry["player"], defaults={"team": entry.get("team")}
             )
             created.append(mp)
         return Response(MatchPlayerSerializer(created, many=True, context={"request": request}).data)
@@ -233,15 +237,37 @@ class MatchViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=["post"])
     def finish(self, request, pk=None):
         """
-        Admin: cierra el partido con el marcador final, evoluciona las medias
-        y registra goles/asistencias por jugador (opcional).
-        Body: {team_a_score, team_b_score, stats: [{player, goals, assists}, ...]}
+        Admin: cierra el partido. Si los convocados todavía no tienen equipo
+        asignado, se puede mandar `teams` para asignarlos en este mismo paso.
+        Body: {
+          team_a_score, team_b_score,
+          teams: [{player, team}, ...] (opcional),
+          stats: [{player, goals, assists}, ...] (opcional),
+        }
         """
         match = self.get_object()
         if match.is_finished:
             return Response(
                 {"detail": "Este partido ya fue finalizado."}, status=status.HTTP_400_BAD_REQUEST
             )
+
+        teams = request.data.get("teams", [])
+        for entry in teams:
+            MatchPlayer.objects.filter(match=match, player_id=entry.get("player")).update(
+                team=entry.get("team")
+            )
+
+        if not match.participants.exists():
+            return Response(
+                {"detail": "No hay jugadores convocados para este partido."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if match.participants.filter(team__isnull=True).exists():
+            return Response(
+                {"detail": "Asigna un equipo a todos los convocados antes de cerrar el partido."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
         match.team_a_score = request.data.get("team_a_score")
         match.team_b_score = request.data.get("team_b_score")
         match.is_finished = True
