@@ -47,6 +47,11 @@ export const api = {
   submitMatchVotes: (matchId, votes) => client.post(`/matches/${matchId}/vote/`, { votes }),
   listMatchVotes: (matchId) => client.get(`/match-votes/?match=${matchId}`),
 
+  // Revisión de Lloros (post-partido: sube/baja ritmo, regate, defensa, físico)
+  getPerformanceReview: (matchId) => client.get(`/matches/${matchId}/performance_review/`),
+  submitPerformanceReview: (matchId, votes) =>
+    client.post(`/matches/${matchId}/submit_performance_review/`, { votes }),
+
   // Cuenta
   updateAccount: (payload) => client.patch("/auth/me/", payload),
   changePassword: (payload) => client.post("/auth/change-password/", payload),

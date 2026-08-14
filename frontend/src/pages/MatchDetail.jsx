@@ -1,7 +1,7 @@
 import { Fragment, useEffect, useState } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, Users, Trophy, Vote, Flag, BarChart3, Goal, Trash2 } from "lucide-react";
+import { ArrowLeft, Users, Trophy, Vote, Flag, BarChart3, Goal, Trash2, Scale } from "lucide-react";
 import Layout from "../components/Layout";
 import PitchLineup from "../components/PitchLineup";
 import { api } from "../api/endpoints";
@@ -37,6 +37,17 @@ function ConvocadosList({ participants }) {
   );
 }
 
+const REVIEW_ATTRS = [
+  { key: "ritmo", label: "RIT" },
+  { key: "tiro", label: "TIR" },
+  { key: "pase", label: "PAS" },
+  { key: "regate", label: "REG" },
+  { key: "defensa", label: "DEF" },
+  { key: "fisico", label: "FIS" },
+];
+const REVIEW_ATTR_LABEL = Object.fromEntries(REVIEW_ATTRS.map((f) => [f.key, f.label]));
+const REVIEW_BUDGET = 3;
+
 export default function MatchDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -56,6 +67,9 @@ export default function MatchDetail() {
   const [votingSaving, setVotingSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [teamAssignments, setTeamAssignments] = useState({});
+  const [reviewStatus, setReviewStatus] = useState(null);
+  const [reviewSelections, setReviewSelections] = useState({});
+  const [reviewSaving, setReviewSaving] = useState(false);
 
   const isAdmin = user?.is_staff;
 
@@ -70,6 +84,8 @@ export default function MatchDetail() {
       const mine = vRes.data.filter((v) => v.voter === user?.id);
       setMyVotes(mine.length > 0 ? mine : null);
       setAllVotes(vRes.data);
+      const rev = await api.getPerformanceReview(id);
+      setReviewStatus(rev.data);
     }
   };
 
@@ -187,6 +203,60 @@ export default function MatchDetail() {
     }
   };
 
+  const reviewBudgetUsed = (playerId) =>
+    Object.values(reviewSelections[playerId] || {}).reduce((sum, d) => sum + Math.abs(d), 0);
+
+  const toggleReviewAttribute = (playerId, attribute) => {
+    setReviewSelections((prev) => {
+      const playerSel = { ...(prev[playerId] || {}) };
+      if (attribute in playerSel) {
+        delete playerSel[attribute];
+      } else {
+        const used = Object.values(playerSel).reduce((sum, d) => sum + Math.abs(d), 0);
+        if (used >= REVIEW_BUDGET) return prev;
+        playerSel[attribute] = 1;
+      }
+      return { ...prev, [playerId]: playerSel };
+    });
+  };
+
+  const adjustReviewDelta = (playerId, attribute, diff) => {
+    setReviewSelections((prev) => {
+      const playerSel = { ...(prev[playerId] || {}) };
+      const current = playerSel[attribute] || 0;
+      const next = current + diff;
+      const otherUsed = Object.entries(playerSel)
+        .filter(([a]) => a !== attribute)
+        .reduce((sum, [, d]) => sum + Math.abs(d), 0);
+      if (otherUsed + Math.abs(next) > REVIEW_BUDGET) return prev;
+      if (next === 0) {
+        delete playerSel[attribute];
+      } else {
+        playerSel[attribute] = Math.max(-3, Math.min(3, next));
+      }
+      return { ...prev, [playerId]: playerSel };
+    });
+  };
+
+  const submitReview = async () => {
+    setError("");
+    setReviewSaving(true);
+    try {
+      const votes = Object.entries(reviewSelections).flatMap(([playerId, attrs]) =>
+        Object.entries(attrs)
+          .filter(([, delta]) => delta !== 0)
+          .map(([attribute, delta]) => ({ target: Number(playerId), attribute, delta }))
+      );
+      const res = await api.submitPerformanceReview(id, votes);
+      setReviewStatus(res.data);
+      setMsg("Revisión de Lloros enviada.");
+    } catch (err) {
+      setError(err.response?.data?.detail || err.friendlyMessage || "No se pudo enviar la Revisión de Lloros.");
+    } finally {
+      setReviewSaving(false);
+    }
+  };
+
   if (loading || !match) {
     return (
       <Layout>
@@ -223,6 +293,7 @@ export default function MatchDetail() {
   // cuela en el Top 5 elegido revienta el envío entero de las 5 elecciones
   // a la vez). Más simple y robusto: quitarte directamente de la lista.
   const voteCandidates = match.participants.filter((mp) => mp.player_detail?.user?.id !== user?.id);
+  const isParticipant = match.participants.some((mp) => mp.player_detail?.user?.id === user?.id);
 
   return (
     <Layout>
@@ -524,6 +595,136 @@ export default function MatchDetail() {
               >
                 Generar Equipo de la Jornada
               </button>
+            )}
+          </section>
+        )}
+
+        {/* Revisión de Lloros */}
+        {match.is_finished && reviewStatus && (
+          <section>
+            <h2 className="text-xs font-semibold uppercase tracking-widest text-floodlight-300/50 mb-3 flex items-center gap-1.5">
+              <Scale size={13} /> Revisión de Lloros
+            </h2>
+
+            {reviewStatus.applied ? (
+              <div className="surface rounded-xl p-3 space-y-1.5">
+                {!reviewStatus.results || reviewStatus.results.length === 0 ? (
+                  <div className="text-sm text-floodlight-300/40 text-center py-2">
+                    Nadie tuvo quejas esta semana.
+                  </div>
+                ) : (
+                  reviewStatus.results.map((r, i) => (
+                    <div key={i} className="flex items-center justify-between text-sm">
+                      <span className="text-floodlight-300">
+                        {r.username} <span className="text-floodlight-300/40">· {REVIEW_ATTR_LABEL[r.attribute]}</span>
+                      </span>
+                      <span
+                        className={`font-display text-lg ${
+                          r.delta > 0 ? "text-floodlight-400" : "text-red-300"
+                        }`}
+                      >
+                        {r.delta > 0 ? `+${r.delta}` : r.delta}
+                      </span>
+                    </div>
+                  ))
+                )}
+              </div>
+            ) : !isParticipant ? (
+              <div className="rounded-xl border border-dashed border-pitch-700 p-4 text-center text-sm text-floodlight-300/40">
+                Solo pueden participar los convocados a este partido.
+              </div>
+            ) : reviewStatus.has_submitted ? (
+              <div className="surface rounded-xl p-3 text-sm text-floodlight-300/60 text-center">
+                Ya has enviado tu Revisión de Lloros. Esperando a los demás ({reviewStatus.submitted_count}/
+                {reviewStatus.total_participants}).
+              </div>
+            ) : (
+              <>
+                <p className="text-xs text-floodlight-300/40 mb-3">
+                  Para cada compañero, reparte hasta {REVIEW_BUDGET} puntos (subir o bajar) entre sus atributos —
+                  p.ej. +2 regate y +1 físico. Es opcional por jugador. Se aplica en cuanto voten todos los
+                  convocados.
+                </p>
+                <div className="space-y-2">
+                  {voteCandidates.map((mp) => {
+                    const sel = reviewSelections[mp.player] || {};
+                    const used = reviewBudgetUsed(mp.player);
+                    const activeAttrs = REVIEW_ATTRS.filter((f) => f.key in sel);
+                    return (
+                      <div key={mp.id} className="surface rounded-xl p-3">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-sm font-semibold text-floodlight-300">
+                            {mp.player_detail?.username}
+                          </span>
+                          <span className="text-[11px] text-floodlight-300/40">
+                            {used}/{REVIEW_BUDGET} puntos
+                          </span>
+                        </div>
+                        <div className="grid grid-cols-6 gap-1 mb-2">
+                          {REVIEW_ATTRS.map((f) => {
+                            const active = f.key in sel;
+                            return (
+                              <button
+                                key={f.key}
+                                type="button"
+                                onClick={() => toggleReviewAttribute(mp.player, f.key)}
+                                disabled={!active && used >= REVIEW_BUDGET}
+                                className={`rounded-lg py-1.5 text-[11px] font-semibold disabled:opacity-30 ${
+                                  active ? "bg-gold-500 text-pitch-900" : "bg-pitch-800 text-floodlight-300/60"
+                                }`}
+                              >
+                                {f.label}
+                              </button>
+                            );
+                          })}
+                        </div>
+                        {activeAttrs.length > 0 && (
+                          <div className="space-y-1.5">
+                            {activeAttrs.map((f) => {
+                              const delta = sel[f.key];
+                              return (
+                                <div key={f.key} className="flex items-center justify-between">
+                                  <span className="text-xs text-floodlight-300/50 w-9">{f.label}</span>
+                                  <div className="flex items-center gap-3">
+                                    <button
+                                      type="button"
+                                      onClick={() => adjustReviewDelta(mp.player, f.key, -1)}
+                                      className="h-7 w-7 rounded-full bg-pitch-800 text-floodlight-300 font-bold"
+                                    >
+                                      −
+                                    </button>
+                                    <span
+                                      className={`font-display text-lg w-8 text-center ${
+                                        delta > 0 ? "text-floodlight-400" : "text-red-300"
+                                      }`}
+                                    >
+                                      {delta > 0 ? `+${delta}` : delta}
+                                    </span>
+                                    <button
+                                      type="button"
+                                      onClick={() => adjustReviewDelta(mp.player, f.key, 1)}
+                                      className="h-7 w-7 rounded-full bg-pitch-800 text-floodlight-300 font-bold"
+                                    >
+                                      +
+                                    </button>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+                <button
+                  onClick={submitReview}
+                  disabled={reviewSaving}
+                  className="mt-3 w-full rounded-xl bg-gold-500 py-3 text-sm font-semibold text-pitch-900 disabled:opacity-50"
+                >
+                  {reviewSaving ? "Enviando..." : "Enviar Revisión de Lloros"}
+                </button>
+              </>
             )}
           </section>
         )}

@@ -389,6 +389,31 @@ class MatchViewSet(viewsets.ModelViewSet):
                 created.append(serializer.save(voter=request.user))
         return Response(MatchVoteSerializer(created, many=True).data, status=status.HTTP_201_CREATED)
 
+    @action(detail=True, methods=["get"], permission_classes=[permissions.IsAuthenticated])
+    def performance_review(self, request, pk=None):
+        """Estado de la Revisión de Lloros de este partido (ver submit_performance_review)."""
+        match = self.get_object()
+        return Response(services.get_performance_review_status(match, request.user))
+
+    @action(detail=True, methods=["post"], permission_classes=[permissions.IsAuthenticated])
+    def submit_performance_review(self, request, pk=None):
+        """
+        "Revisión de Lloros": un convocado reparte, para cada compañero
+        convocado (opcional), hasta 3 puntos (subir o bajar) entre los 6
+        atributos, p.ej. +2 regate y +1 fisico. En cuanto han votado todos
+        los convocados, se aplica automáticamente.
+        Body: {"votes": [{"target": player_id, "attribute": str, "delta": int}, ...]}
+        """
+        match = self.get_object()
+        entries = request.data.get("votes", [])
+        try:
+            services.submit_performance_review(match, request.user, entries)
+        except ValueError as e:
+            return Response({"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(
+            services.get_performance_review_status(match, request.user), status=status.HTTP_201_CREATED
+        )
+
 
 class MatchVoteViewSet(viewsets.ModelViewSet):
     queryset = MatchVote.objects.all()

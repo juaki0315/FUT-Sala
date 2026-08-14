@@ -93,6 +93,10 @@ class Match(models.Model):
     # el pasado o el futuro.
     finished_at = models.DateTimeField(null=True, blank=True)
     totw_generated_at = models.DateTimeField(null=True, blank=True)
+    # "Revisión de Lloros": se aplica automáticamente en cuanto todos los
+    # convocados han emitido su voto (ver services.submit_performance_review).
+    performance_review_applied = models.BooleanField(default=False)
+    performance_review_applied_at = models.DateTimeField(null=True, blank=True)
 
     def __str__(self):
         return f"Partido {self.date_played:%Y-%m-%d} ({self.team_a_score}-{self.team_b_score})"
@@ -204,3 +208,60 @@ class MatchVote(models.Model):
 
     def __str__(self):
         return f"{self.voter} -> {self.voted_player} ({self.points}pts) [{self.match}]"
+
+
+PERFORMANCE_REVIEW_ATTRS = ("ritmo", "tiro", "pase", "regate", "defensa", "fisico")
+PERFORMANCE_REVIEW_MAX_DELTA = 3
+# Presupuesto total (suma de valores absolutos) que cada votante puede
+# repartir entre los atributos de UN mismo compañero: p.ej. +2 regate y
+# +1 fisico gasta los 3 puntos; subir o bajar 1 punto cuenta igual.
+PERFORMANCE_REVIEW_BUDGET = 3
+
+
+class MatchPerformanceReview(models.Model):
+    """
+    Marca que un convocado ya emitió su "Revisión de Lloros" de este
+    partido (aunque no puntúe a nadie). Sirve para saber cuándo han
+    votado todos los convocados y aplicar el resultado automáticamente.
+    """
+
+    match = models.ForeignKey(Match, on_delete=models.CASCADE, related_name="performance_reviews")
+    voter = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="performance_reviews_cast"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ("match", "voter")
+
+
+class MatchPerformanceVote(models.Model):
+    """
+    Voto individual de la "Revisión de Lloros": un convocado reparte, para
+    otro convocado, hasta PERFORMANCE_REVIEW_BUDGET puntos (subir o bajar,
+    en valor absoluto) entre los 6 atributos, p.ej. +2 regate y +1 fisico.
+    Una fila por (partido, votante, objetivo, atributo).
+    """
+
+    ATTR_CHOICES = [(f, f) for f in PERFORMANCE_REVIEW_ATTRS]
+
+    match = models.ForeignKey(Match, on_delete=models.CASCADE, related_name="performance_votes")
+    voter = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="performance_votes_cast"
+    )
+    target = models.ForeignKey(
+        PlayerProfile, on_delete=models.CASCADE, related_name="performance_votes_received"
+    )
+    attribute = models.CharField(max_length=10, choices=ATTR_CHOICES)
+    delta = models.SmallIntegerField(
+        validators=[
+            MinValueValidator(-PERFORMANCE_REVIEW_MAX_DELTA),
+            MaxValueValidator(PERFORMANCE_REVIEW_MAX_DELTA),
+        ]
+    )
+
+    class Meta:
+        unique_together = ("match", "voter", "target", "attribute")
+
+    def __str__(self):
+        return f"{self.voter} -> {self.target} {self.attribute} {self.delta:+d} [{self.match}]"

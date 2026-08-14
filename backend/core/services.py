@@ -11,7 +11,19 @@ from django.db import transaction
 from django.db.models import Max
 from django.utils import timezone
 
-from .models import InitialVote, Match, MatchPlayer, MatchVote, PlayerBadge, PlayerProfile
+from .models import (
+    InitialVote,
+    Match,
+    MatchPerformanceReview,
+    MatchPerformanceVote,
+    MatchPlayer,
+    MatchVote,
+    PERFORMANCE_REVIEW_ATTRS,
+    PERFORMANCE_REVIEW_BUDGET,
+    PERFORMANCE_REVIEW_MAX_DELTA,
+    PlayerBadge,
+    PlayerProfile,
+)
 
 ATTR_FIELDS = ["ritmo", "tiro", "pase", "regate", "defensa", "fisico"]
 STAR_FIELDS = ["pierna_mala", "filigranas"]
@@ -724,3 +736,142 @@ def get_records(request=None) -> list[dict]:
             })
 
     return records
+
+
+def _aggregate_performance_votes(match) -> list[dict]:
+    """
+    Agrega los votos de la Revisión de Lloros por (jugador, atributo): media
+    de los votos recibidos, redondeada, con tope ±3. Se puede recalcular en
+    cualquier momento a partir de los votos guardados (no se persiste aparte).
+    """
+    votes = MatchPerformanceVote.objects.filter(match=match).select_related("target__user")
+    sums: dict[tuple[int, str], list[int]] = {}
+    usernames: dict[int, str] = {}
+    for v in votes:
+        sums.setdefault((v.target_id, v.attribute), []).append(v.delta)
+        usernames[v.target_id] = v.target.user.username
+
+    results = []
+    for (target_id, attribute), deltas in sums.items():
+        avg = round(sum(deltas) / len(deltas))
+        avg = max(-PERFORMANCE_REVIEW_MAX_DELTA, min(PERFORMANCE_REVIEW_MAX_DELTA, avg))
+        if avg != 0:
+            results.append({
+                "player_id": target_id,
+                "username": usernames[target_id],
+                "attribute": attribute,
+                "delta": avg,
+            })
+    return results
+
+
+def get_performance_review_status(match, user) -> dict:
+    """Estado de la Revisión de Lloros de un partido para la UI: cuánta gente
+    ha votado, lo que votó el usuario actual (si votó), y el resultado final
+    si ya se aplicó."""
+    total_participants = match.participants.count()
+    submitted_voter_ids = set(
+        MatchPerformanceReview.objects.filter(match=match).values_list("voter_id", flat=True)
+    )
+    has_submitted = bool(user and user.is_authenticated and user.id in submitted_voter_ids)
+
+    my_votes = []
+    if has_submitted:
+        my_votes = [
+            {
+                "target": v.target_id,
+                "username": v.target.user.username,
+                "attribute": v.attribute,
+                "delta": v.delta,
+            }
+            for v in MatchPerformanceVote.objects.filter(match=match, voter=user).select_related("target__user")
+        ]
+
+    return {
+        "total_participants": total_participants,
+        "submitted_count": len(submitted_voter_ids),
+        "has_submitted": has_submitted,
+        "my_votes": my_votes,
+        "applied": match.performance_review_applied,
+        "results": _aggregate_performance_votes(match) if match.performance_review_applied else None,
+    }
+
+
+@transaction.atomic
+def _apply_performance_review(match) -> None:
+    for r in _aggregate_performance_votes(match):
+        profile = PlayerProfile.objects.get(id=r["player_id"])
+        current = getattr(profile, r["attribute"])
+        setattr(profile, r["attribute"], max(1, min(99, current + r["delta"])))
+        profile.save(update_fields=[r["attribute"]])
+
+    match.performance_review_applied = True
+    match.performance_review_applied_at = timezone.now()
+    match.save(update_fields=["performance_review_applied", "performance_review_applied_at"])
+
+
+@transaction.atomic
+def submit_performance_review(match, user, entries: list[dict]) -> None:
+    """
+    Registra el voto ("Revisión de Lloros") de un convocado sobre el resto de
+    convocados de `match`. `entries`: [{"target": player_id, "attribute": str, "delta": int}, ...]
+    Por cada compañero, el votante reparte como mucho PERFORMANCE_REVIEW_BUDGET
+    puntos en total (sumando valores absolutos) entre los 6 atributos, p.ej.
+    +2 regate y +1 fisico. Un voto por partido y persona, no editable. Si con
+    este voto ya han votado todos los convocados, se aplica el resultado
+    automáticamente.
+    """
+    if not match.is_finished:
+        raise ValueError("El partido todavía no ha finalizado.")
+    if match.performance_review_applied:
+        raise ValueError("La Revisión de Lloros de este partido ya se ha cerrado.")
+
+    voter_mp = match.participants.filter(player__user=user).first()
+    if not voter_mp:
+        raise ValueError("Solo pueden participar en la Revisión de Lloros los convocados a este partido.")
+    if MatchPerformanceReview.objects.filter(match=match, voter=user).exists():
+        raise ValueError("Ya has enviado tu Revisión de Lloros de este partido. No se puede editar.")
+
+    participant_player_ids = set(match.participants.values_list("player_id", flat=True))
+    seen = set()
+    budget_used: dict[int, int] = {}
+    to_create = []
+    for entry in entries:
+        target_id = entry.get("target")
+        attribute = entry.get("attribute")
+        try:
+            delta = int(entry.get("delta"))
+        except (TypeError, ValueError):
+            raise ValueError("El ajuste debe ser un número entero.")
+
+        if target_id == voter_mp.player_id:
+            raise ValueError("No puedes votarte a ti mismo.")
+        if target_id not in participant_player_ids:
+            raise ValueError("Solo puedes votar a jugadores convocados a este partido.")
+        if attribute not in PERFORMANCE_REVIEW_ATTRS:
+            raise ValueError("Atributo no válido para la Revisión de Lloros.")
+        if (target_id, attribute) in seen:
+            raise ValueError("Solo puedes asignar una vez cada estadística a un mismo compañero.")
+        if not (-PERFORMANCE_REVIEW_MAX_DELTA <= delta <= PERFORMANCE_REVIEW_MAX_DELTA):
+            raise ValueError(f"Cada ajuste debe estar entre -{PERFORMANCE_REVIEW_MAX_DELTA} y {PERFORMANCE_REVIEW_MAX_DELTA}.")
+        if delta == 0:
+            continue
+
+        seen.add((target_id, attribute))
+        budget_used[target_id] = budget_used.get(target_id, 0) + abs(delta)
+        if budget_used[target_id] > PERFORMANCE_REVIEW_BUDGET:
+            raise ValueError(
+                f"Solo puedes repartir un máximo de {PERFORMANCE_REVIEW_BUDGET} puntos (subir o bajar) por compañero."
+            )
+
+        to_create.append(
+            MatchPerformanceVote(match=match, voter=user, target_id=target_id, attribute=attribute, delta=delta)
+        )
+
+    MatchPerformanceReview.objects.create(match=match, voter=user)
+    MatchPerformanceVote.objects.bulk_create(to_create)
+
+    total_participants = match.participants.count()
+    submitted = MatchPerformanceReview.objects.filter(match=match).count()
+    if submitted >= total_participants:
+        _apply_performance_review(match)
