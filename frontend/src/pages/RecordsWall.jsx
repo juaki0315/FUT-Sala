@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { Link } from "react-router-dom";
 import {
-  ArrowLeft,
   Target,
   Send,
   Goal,
@@ -17,6 +16,7 @@ import {
   TrendingUp,
 } from "lucide-react";
 import Layout from "../components/Layout";
+import PageHeader from "../components/PageHeader";
 import { api } from "../api/endpoints";
 
 const RECORD_ICONS = {
@@ -105,7 +105,6 @@ function RecordCard({ record }) {
 }
 
 export default function RecordsWall() {
-  const navigate = useNavigate();
   const [records, setRecords] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -118,17 +117,7 @@ export default function RecordsWall() {
 
   return (
     <Layout>
-      <div className="px-5 pt-6 pb-4 flex items-center gap-3 border-b border-pitch-800">
-        <button onClick={() => navigate(-1)} className="text-floodlight-300/60">
-          <ArrowLeft size={20} />
-        </button>
-        <div>
-          <div className="text-[11px] uppercase tracking-widest text-floodlight-500/70 font-semibold">
-            Marcas históricas
-          </div>
-          <h1 className="title-gradient font-display text-2xl leading-none">Muro de récords</h1>
-        </div>
-      </div>
+      <PageHeader eyebrow="Marcas históricas" title="Hall of Fame" />
 
       <div className="px-5 py-5 space-y-3">
         {loading ? (

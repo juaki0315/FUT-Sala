@@ -1,11 +1,12 @@
 import { NavLink } from "react-router-dom";
-import { Home, CreditCard, Swords, Trophy } from "lucide-react";
+import { Home, CreditCard, Swords, Trophy, Medal } from "lucide-react";
 
 const ITEMS = [
   { to: "/", label: "Inicio", icon: Home, end: true },
   { to: "/mi-carta", label: "Mi Carta", icon: CreditCard },
   { to: "/partidos", label: "Partidos", icon: Swords },
   { to: "/totj", label: "TOTJ", icon: Trophy },
+  { to: "/records", label: "Hall of Fame", icon: Medal },
 ];
 
 export default function BottomNav() {
