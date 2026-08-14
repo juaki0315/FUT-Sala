@@ -16,6 +16,8 @@ import AccountSettings from "./pages/AccountSettings";
 import PlayersBrowser from "./pages/PlayersBrowser";
 import PlayerDetail from "./pages/PlayerDetail";
 import AdminUsersOverview from "./pages/AdminUsersOverview";
+import RecordsWall from "./pages/RecordsWall";
+import ComparePlayers from "./pages/ComparePlayers";
 
 function PrivateRoute({ children }) {
   const { user, ready } = useAuth();
@@ -104,6 +106,22 @@ function AppRoutes() {
         element={
           <PrivateRoute>
             <PlayerDetail />
+          </PrivateRoute>
+        }
+      />
+      <Route
+        path="/records"
+        element={
+          <PrivateRoute>
+            <RecordsWall />
+          </PrivateRoute>
+        }
+      />
+      <Route
+        path="/comparar"
+        element={
+          <PrivateRoute>
+            <ComparePlayers />
           </PrivateRoute>
         }
       />

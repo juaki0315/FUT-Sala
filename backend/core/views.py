@@ -152,6 +152,15 @@ class ActivityFeedView(APIView):
         return Response(services.get_activity_feed(request))
 
 
+class RecordsView(APIView):
+    """Muro de récords: mejores marcas históricas del grupo."""
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        return Response(services.get_records(request))
+
+
 class PlayerProfileViewSet(viewsets.ModelViewSet):
     queryset = PlayerProfile.objects.select_related("user").all()
     serializer_class = PlayerProfileSerializer

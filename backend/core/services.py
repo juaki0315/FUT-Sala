@@ -8,6 +8,7 @@ Lógica de negocio de FUT-Sala Tracker:
 from decimal import Decimal, ROUND_HALF_UP
 
 from django.db import transaction
+from django.db.models import Max
 from django.utils import timezone
 
 from .models import InitialVote, Match, MatchPlayer, MatchVote, PlayerBadge, PlayerProfile
@@ -531,3 +532,195 @@ def get_activity_feed(request, limit: int = 30) -> list[dict]:
 
     events.sort(key=lambda e: e["timestamp"], reverse=True)
     return events[:limit]
+
+
+def _longest_streak(history_oldest_first: list[dict], predicate) -> int:
+    """Longitud de la racha consecutiva más larga que cumple `predicate`."""
+    best = current = 0
+    for h in history_oldest_first:
+        if predicate(h):
+            current += 1
+            best = max(best, current)
+        else:
+            current = 0
+    return best
+
+
+def get_records(request=None) -> list[dict]:
+    """
+    "Muro de récords": mejores marcas históricas del grupo, individuales y de
+    partido. Se recalcula al vuelo a partir de los datos existentes, sin
+    tablas propias. Cada récord puede tener varios poseedores empatados.
+    """
+
+    def photo_url(profile):
+        if not profile.photo:
+            return ""
+        return request.build_absolute_uri(profile.photo.url) if request else profile.photo.url
+
+    def player_holder(profile, value, extra=None):
+        d = {
+            "player_id": profile.id,
+            "username": profile.user.username,
+            "photo_url": photo_url(profile),
+            "value": value,
+        }
+        if extra:
+            d.update(extra)
+        return d
+
+    profiles = list(PlayerProfile.objects.select_related("user").all())
+    records = []
+
+    # --- Mejor actuación individual en un único partido ---
+    max_goals = (
+        MatchPlayer.objects.filter(match__is_finished=True).aggregate(Max("goals"))["goals__max"] or 0
+    )
+    if max_goals > 0:
+        rows = MatchPlayer.objects.filter(match__is_finished=True, goals=max_goals).select_related(
+            "player__user", "match"
+        )
+        records.append({
+            "code": "goals_match",
+            "name": "Más goles en un partido",
+            "unit": "goles",
+            "type": "player",
+            "holders": [
+                player_holder(mp.player, mp.goals, {"match_id": mp.match_id, "date_played": mp.match.date_played})
+                for mp in rows
+            ],
+        })
+
+    max_assists = (
+        MatchPlayer.objects.filter(match__is_finished=True).aggregate(Max("assists"))["assists__max"] or 0
+    )
+    if max_assists > 0:
+        rows = MatchPlayer.objects.filter(match__is_finished=True, assists=max_assists).select_related(
+            "player__user", "match"
+        )
+        records.append({
+            "code": "assists_match",
+            "name": "Más asistencias en un partido",
+            "unit": "asistencias",
+            "type": "player",
+            "holders": [
+                player_holder(mp.player, mp.assists, {"match_id": mp.match_id, "date_played": mp.match.date_played})
+                for mp in rows
+            ],
+        })
+
+    # --- Marcas de carrera (acumuladas) ---
+    stats_by_player = {p.id: get_player_stats(p) for p in profiles}
+
+    def career_record(key, code, name, unit):
+        max_val = max((s[key] for s in stats_by_player.values()), default=0)
+        if max_val <= 0:
+            return None
+        holders = [player_holder(p, max_val) for p in profiles if stats_by_player[p.id][key] == max_val]
+        return {"code": code, "name": name, "unit": unit, "type": "player", "holders": holders}
+
+    for rec in [
+        career_record("goals", "career_goals", "Máximo goleador histórico", "goles"),
+        career_record("assists", "career_assists", "Máximo asistente histórico", "asistencias"),
+        career_record("matches_played", "career_matches", "Más partidos disputados", "partidos"),
+        career_record("wins", "career_wins", "Más victorias", "victorias"),
+        career_record("totw_count", "career_totw", "Más veces en el TOTJ", "veces"),
+    ]:
+        if rec:
+            records.append(rec)
+
+    # --- Más veces MVP (rank 1 del TOTJ) ---
+    mvp_counts = {p.id: MatchPlayer.objects.filter(player=p, totw_rank=1).count() for p in profiles}
+    max_mvp = max(mvp_counts.values(), default=0)
+    if max_mvp > 0:
+        records.append({
+            "code": "career_mvp",
+            "name": "Más veces MVP",
+            "unit": "veces",
+            "type": "player",
+            "holders": [player_holder(p, max_mvp) for p in profiles if mvp_counts[p.id] == max_mvp],
+        })
+
+    # --- Más insignias conseguidas ---
+    badge_counts = {p.id: p.badges.count() for p in profiles}
+    max_badges = max(badge_counts.values(), default=0)
+    if max_badges > 0:
+        records.append({
+            "code": "badge_count",
+            "name": "Más insignias conseguidas",
+            "unit": "insignias",
+            "type": "player",
+            "holders": [player_holder(p, max_badges) for p in profiles if badge_counts[p.id] == max_badges],
+        })
+
+    # --- Rachas más largas de la historia (no solo si superaron un umbral) ---
+    streak_defs = [
+        ("longest_win_streak", "Racha de victorias más larga", "partidos seguidos", lambda h: h["result"] == "win"),
+        (
+            "longest_unbeaten_streak",
+            "Racha invicta más larga",
+            "partidos seguidos",
+            lambda h: h["result"] in ("win", "draw"),
+        ),
+        ("longest_scoring_streak", "Racha goleadora más larga", "partidos seguidos", lambda h: h["goals"] > 0),
+    ]
+    for code, name, unit, predicate in streak_defs:
+        best_val = 0
+        best_players = []
+        for p in profiles:
+            history_oldest_first = list(reversed(get_player_match_history(p)))
+            val = _longest_streak(history_oldest_first, predicate)
+            if val > best_val:
+                best_val = val
+                best_players = [p]
+            elif val == best_val and val > 0:
+                best_players.append(p)
+        if best_val > 0:
+            records.append({
+                "code": code,
+                "name": name,
+                "unit": unit,
+                "type": "player",
+                "holders": [player_holder(p, best_val) for p in best_players],
+            })
+
+    # --- Récords de partido (sin poseedor individual) ---
+    finished = list(
+        Match.objects.filter(is_finished=True, team_a_score__isnull=False, team_b_score__isnull=False)
+    )
+    if finished:
+        def match_entry(m, value):
+            return {
+                "match_id": m.id,
+                "date_played": m.date_played,
+                "value": value,
+                "team_a_score": m.team_a_score,
+                "team_b_score": m.team_b_score,
+            }
+
+        combined_val = max(m.team_a_score + m.team_b_score for m in finished)
+        records.append({
+            "code": "match_combined_goals",
+            "name": "Partido más goleador",
+            "unit": "goles totales",
+            "type": "match",
+            "holders": [
+                match_entry(m, combined_val) for m in finished if m.team_a_score + m.team_b_score == combined_val
+            ],
+        })
+
+        biggest_val = max(abs(m.team_a_score - m.team_b_score) for m in finished)
+        if biggest_val > 0:
+            records.append({
+                "code": "match_biggest_win",
+                "name": "Victoria más abultada",
+                "unit": "goles de diferencia",
+                "type": "match",
+                "holders": [
+                    match_entry(m, biggest_val)
+                    for m in finished
+                    if abs(m.team_a_score - m.team_b_score) == biggest_val
+                ],
+            })
+
+    return records

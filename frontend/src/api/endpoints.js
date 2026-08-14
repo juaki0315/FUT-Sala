@@ -40,6 +40,9 @@ export const api = {
   pendingReveal: () => client.get("/players/me/pending_reveal/"),
   dismissReveal: (matchId) => client.post("/players/me/dismiss_reveal/", { match_id: matchId }),
 
+  // Muro de récords
+  records: () => client.get("/records/"),
+
   // Votación post-partido (inmutable: se manda el Top 5 completo en una sola petición)
   submitMatchVotes: (matchId, votes) => client.post(`/matches/${matchId}/vote/`, { votes }),
   listMatchVotes: (matchId) => client.get(`/match-votes/?match=${matchId}`),

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
-import { CalendarClock, ChevronRight, Trophy, ClipboardCheck, Search } from "lucide-react";
+import { CalendarClock, ChevronRight, Trophy, ClipboardCheck, Search, Medal, Users2 } from "lucide-react";
 import Layout from "../components/Layout";
 import PageHeader from "../components/PageHeader";
 import PlayerCard from "../components/PlayerCard";
@@ -165,6 +165,30 @@ export default function HomePage() {
               Aún no se ha generado el TOTJ de esta jornada.
             </div>
           )}
+        </section>
+
+        {/* Récords y comparativa */}
+        <section>
+          <div className="grid grid-cols-2 gap-2">
+            <Link
+              to="/records"
+              className="surface surface-interactive flex flex-col items-center gap-2 rounded-2xl p-4 text-center hover:border-gold-500/50"
+            >
+              <div className="glow-gold h-10 w-10 rounded-xl bg-gold-500/15 flex items-center justify-center text-gold-400">
+                <Medal size={19} />
+              </div>
+              <span className="text-sm font-semibold text-floodlight-300">Muro de récords</span>
+            </Link>
+            <Link
+              to="/comparar"
+              className="surface surface-interactive flex flex-col items-center gap-2 rounded-2xl p-4 text-center hover:border-gold-500/50"
+            >
+              <div className="h-10 w-10 rounded-xl bg-floodlight-500/10 flex items-center justify-center text-floodlight-400">
+                <Users2 size={19} />
+              </div>
+              <span className="text-sm font-semibold text-floodlight-300">Comparar jugadores</span>
+            </Link>
+          </div>
         </section>
 
         {/* Mi carta resumida */}

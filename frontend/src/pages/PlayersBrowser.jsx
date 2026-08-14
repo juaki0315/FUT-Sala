@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { ArrowLeft, ChevronRight, Search } from "lucide-react";
+import { ArrowLeft, ChevronRight, Search, Users2 } from "lucide-react";
 import Layout from "../components/Layout";
 import { api } from "../api/endpoints";
 
@@ -27,12 +27,18 @@ export default function PlayersBrowser() {
         <button onClick={() => navigate(-1)} className="text-floodlight-300/60">
           <ArrowLeft size={20} />
         </button>
-        <div>
+        <div className="flex-1">
           <div className="text-[11px] uppercase tracking-widest text-floodlight-500/70 font-semibold">
             Plantilla
           </div>
           <h1 className="font-display text-2xl text-floodlight-300 leading-none">Jugadores</h1>
         </div>
+        <Link
+          to="/comparar"
+          className="h-9 w-9 rounded-full bg-pitch-850 border border-pitch-700 flex items-center justify-center text-floodlight-300/70 hover:text-gold-400 hover:border-gold-500/40 transition-colors"
+        >
+          <Users2 size={16} />
+        </Link>
       </div>
 
       <div className="px-5 pt-4">
