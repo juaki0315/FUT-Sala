@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { CalendarPlus, Flag, Trophy } from "lucide-react";
+import { CalendarPlus, ChevronRight, Flag, Trophy } from "lucide-react";
 import { api } from "../api/endpoints";
 import { BADGE_ICONS } from "../data/badges";
 
@@ -112,23 +112,28 @@ function FeedItem({ event }) {
 }
 
 /** Feed cronológico de novedades del grupo: partidos, TOTJ, insignias. */
-export default function ActivityFeed() {
+export default function ActivityFeed({ limit, showAllLink = false, showHeader = true }) {
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     api
-      .activityFeed()
+      .activityFeed(limit ? Math.max(limit, 30) : undefined)
       .then((res) => setEvents(res.data))
       .finally(() => setLoading(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const visible = limit ? events.slice(0, limit) : events;
 
   if (loading) {
     return (
       <section>
-        <h2 className="text-xs font-semibold uppercase tracking-widest text-floodlight-300/50 mb-2">
-          Novedades
-        </h2>
+        {showHeader && (
+          <h2 className="text-xs font-semibold uppercase tracking-widest text-floodlight-300/50 mb-2">
+            Novedades
+          </h2>
+        )}
         <div className="space-y-2">
           <div className="h-14 rounded-xl bg-pitch-850 animate-pulse" />
           <div className="h-14 rounded-xl bg-pitch-850 animate-pulse" />
@@ -141,11 +146,21 @@ export default function ActivityFeed() {
 
   return (
     <section>
-      <h2 className="text-xs font-semibold uppercase tracking-widest text-floodlight-300/50 mb-2">
-        Novedades
-      </h2>
+      {showHeader && (
+        <div className="flex items-center justify-between mb-2">
+          <h2 className="text-xs font-semibold uppercase tracking-widest text-floodlight-300/50">Novedades</h2>
+          {showAllLink && events.length > visible.length && (
+            <Link
+              to="/novedades"
+              className="flex items-center gap-0.5 text-[11px] font-semibold text-gold-400"
+            >
+              Ver todas <ChevronRight size={12} />
+            </Link>
+          )}
+        </div>
+      )}
       <div className="space-y-2">
-        {events.map((event, i) => (
+        {visible.map((event, i) => (
           <FeedItem key={`${event.type}-${event.match_id ?? event.player_id}-${event.badge_code ?? i}-${i}`} event={event} />
         ))}
       </div>

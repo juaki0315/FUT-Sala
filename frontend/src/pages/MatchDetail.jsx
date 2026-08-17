@@ -655,17 +655,25 @@ export default function MatchDetail() {
                         <div className="grid grid-cols-6 gap-1 mb-2">
                           {REVIEW_ATTRS.map((f) => {
                             const active = f.key in sel;
+                            const current = mp.player_detail?.[f.key];
                             return (
                               <button
                                 key={f.key}
                                 type="button"
                                 onClick={() => toggleReviewAttribute(mp.player, f.key)}
                                 disabled={!active && used >= REVIEW_BUDGET}
-                                className={`rounded-lg py-1.5 text-[11px] font-semibold disabled:opacity-30 ${
+                                className={`flex flex-col items-center gap-0.5 rounded-lg py-1.5 text-[11px] font-semibold disabled:opacity-30 ${
                                   active ? "bg-gold-500 text-pitch-900" : "bg-pitch-800 text-floodlight-300/60"
                                 }`}
                               >
-                                {f.label}
+                                <span>{f.label}</span>
+                                <span
+                                  className={`text-[9px] font-normal ${
+                                    active ? "text-pitch-900/60" : "text-floodlight-300/30"
+                                  }`}
+                                >
+                                  {current}
+                                </span>
                               </button>
                             );
                           })}
@@ -674,9 +682,12 @@ export default function MatchDetail() {
                           <div className="space-y-1.5">
                             {activeAttrs.map((f) => {
                               const delta = sel[f.key];
+                              const current = mp.player_detail?.[f.key] ?? 0;
                               return (
                                 <div key={f.key} className="flex items-center justify-between">
-                                  <span className="text-xs text-floodlight-300/50 w-9">{f.label}</span>
+                                  <span className="text-xs text-floodlight-300/50 w-16">
+                                    {f.label} <span className="text-floodlight-300/30">({current})</span>
+                                  </span>
                                   <div className="flex items-center gap-3">
                                     <button
                                       type="button"

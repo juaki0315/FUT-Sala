@@ -547,6 +547,47 @@ def get_activity_feed(request, limit: int = 30) -> list[dict]:
     return events[:limit]
 
 
+def get_totw_history(request, limit: int = 50) -> list[dict]:
+    """
+    Histórico de Equipos de la Jornada generados, más reciente primero. El
+    `totw_rank` de cada MatchPlayer se conserva para siempre (no se borra al
+    expirar el boost temporal), así que esto se computa al vuelo sin guardar
+    nada aparte.
+    """
+
+    def photo_url(profile):
+        if not profile.photo:
+            return ""
+        return request.build_absolute_uri(profile.photo.url) if request else profile.photo.url
+
+    matches = Match.objects.filter(totw_generated=True).order_by("-totw_generated_at", "-date_played")[:limit]
+
+    history = []
+    for match in matches:
+        entries = (
+            MatchPlayer.objects.filter(match=match, totw_rank__isnull=False)
+            .select_related("player__user")
+            .order_by("totw_rank")
+        )
+        history.append({
+            "match_id": match.id,
+            "date_played": match.date_played,
+            "team_a_score": match.team_a_score,
+            "team_b_score": match.team_b_score,
+            "totw": [
+                {
+                    "player_id": mp.player_id,
+                    "username": mp.player.user.username,
+                    "photo_url": photo_url(mp.player),
+                    "rank": mp.totw_rank,
+                    "overall_rating": mp.player.overall_rating,
+                }
+                for mp in entries
+            ],
+        })
+    return history
+
+
 def _longest_streak(history_oldest_first: list[dict], predicate) -> int:
     """Longitud de la racha consecutiva más larga que cumple `predicate`."""
     best = current = 0

@@ -149,7 +149,18 @@ class ActivityFeedView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request):
-        return Response(services.get_activity_feed(request))
+        limit = int(request.query_params.get("limit", 30))
+        return Response(services.get_activity_feed(request, limit=limit))
+
+
+class TotwHistoryView(APIView):
+    """Histórico de Equipos de la Jornada generados, más reciente primero."""
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        limit = int(request.query_params.get("limit", 50))
+        return Response(services.get_totw_history(request, limit=limit))
 
 
 class RecordsView(APIView):

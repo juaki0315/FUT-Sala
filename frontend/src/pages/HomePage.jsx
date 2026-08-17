@@ -96,7 +96,7 @@ export default function HomePage() {
           </Link>
         )}
 
-        <ActivityFeed />
+        <ActivityFeed limit={3} showAllLink />
 
         {/* Próximo partido */}
         <section>

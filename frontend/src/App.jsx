@@ -17,6 +17,7 @@ import PlayersBrowser from "./pages/PlayersBrowser";
 import PlayerDetail from "./pages/PlayerDetail";
 import AdminUsersOverview from "./pages/AdminUsersOverview";
 import RecordsWall from "./pages/RecordsWall";
+import ActivityFeedPage from "./pages/ActivityFeedPage";
 import ComparePlayers from "./pages/ComparePlayers";
 
 function PrivateRoute({ children }) {
@@ -114,6 +115,14 @@ function AppRoutes() {
         element={
           <PrivateRoute>
             <RecordsWall />
+          </PrivateRoute>
+        }
+      />
+      <Route
+        path="/novedades"
+        element={
+          <PrivateRoute>
+            <ActivityFeedPage />
           </PrivateRoute>
         }
       />

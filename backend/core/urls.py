@@ -17,5 +17,6 @@ urlpatterns = [
     path("admin/users/<int:pk>/", views.AdminUserDetailView.as_view(), name="admin-user-detail"),
     path("activity/", views.ActivityFeedView.as_view(), name="activity-feed"),
     path("records/", views.RecordsView.as_view(), name="records"),
+    path("totw-history/", views.TotwHistoryView.as_view(), name="totw-history"),
     path("", include(router.urls)),
 ]
