@@ -1,6 +1,14 @@
 from django.contrib import admin
 
-from .models import EvaluatorAssignment, InitialVote, Match, MatchPlayer, MatchVote, PlayerProfile
+from .models import (
+    EvaluatorAssignment,
+    InitialVote,
+    Match,
+    MatchPlayer,
+    MatchVote,
+    PlayerBadge,
+    PlayerProfile,
+)
 
 
 @admin.register(PlayerProfile)
@@ -18,8 +26,11 @@ class MatchAdmin(admin.ModelAdmin):
 
 @admin.register(MatchPlayer)
 class MatchPlayerAdmin(admin.ModelAdmin):
-    list_display = ["match", "player", "team", "is_totw", "totw_boost", "totw_rank"]
+    list_display = ["match", "player", "team", "goals", "assists", "is_totw", "totw_boost", "totw_rank"]
+    list_editable = ["goals", "assists"]
     list_filter = ["team", "is_totw"]
+    search_fields = ["player__user__username"]
+    list_select_related = ["match", "player__user"]
 
 
 @admin.register(InitialVote)
@@ -35,3 +46,10 @@ class EvaluatorAssignmentAdmin(admin.ModelAdmin):
 @admin.register(MatchVote)
 class MatchVoteAdmin(admin.ModelAdmin):
     list_display = ["match", "voter", "voted_player", "points"]
+
+
+@admin.register(PlayerBadge)
+class PlayerBadgeAdmin(admin.ModelAdmin):
+    list_display = ["player", "code", "match", "unlocked_at"]
+    list_filter = ["code"]
+    search_fields = ["player__user__username"]
