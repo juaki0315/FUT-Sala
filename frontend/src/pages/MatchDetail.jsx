@@ -214,7 +214,7 @@ export default function MatchDetail() {
       } else {
         const used = Object.values(playerSel).reduce((sum, d) => sum + Math.abs(d), 0);
         if (used >= REVIEW_BUDGET) return prev;
-        playerSel[attribute] = 1;
+        playerSel[attribute] = 0;
       }
       return { ...prev, [playerId]: playerSel };
     });
@@ -229,11 +229,7 @@ export default function MatchDetail() {
         .filter(([a]) => a !== attribute)
         .reduce((sum, [, d]) => sum + Math.abs(d), 0);
       if (otherUsed + Math.abs(next) > REVIEW_BUDGET) return prev;
-      if (next === 0) {
-        delete playerSel[attribute];
-      } else {
-        playerSel[attribute] = Math.max(-3, Math.min(3, next));
-      }
+      playerSel[attribute] = Math.max(-3, Math.min(3, next));
       return { ...prev, [playerId]: playerSel };
     });
   };
@@ -695,7 +691,11 @@ export default function MatchDetail() {
                                     </button>
                                     <span
                                       className={`font-display text-lg w-8 text-center ${
-                                        delta > 0 ? "text-floodlight-400" : "text-red-300"
+                                        delta > 0
+                                          ? "text-floodlight-400"
+                                          : delta < 0
+                                            ? "text-red-300"
+                                            : "text-floodlight-300/40"
                                       }`}
                                     >
                                       {delta > 0 ? `+${delta}` : delta}
