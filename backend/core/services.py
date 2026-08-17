@@ -35,8 +35,8 @@ TOTW_BOOSTS = {1: 5, 2: 4, 3: 3, 4: 2, 5: 1}
 # según el resultado del equipo del jugador.
 GROWTH_BY_OUTCOME = {
     "win": Decimal("1"),
-    "draw": Decimal("0.75"),
-    "loss": Decimal("0.5"),
+    "draw": Decimal("0.5"),
+    "loss": Decimal("0"),
 }
 # Bonus adicional, permanente, para quien sale en el Equipo de la Jornada
 # (aparte del boost temporal de OVR que ya recibe su carta).
@@ -782,7 +782,9 @@ def _reconcile_performance_vote(match, target_id, attribute) -> None:
 def get_performance_review_status(match, user) -> dict:
     """Estado de la Revisión de Lloros de un partido para la UI: cuánta gente
     ha votado, lo que votó el usuario actual (si votó), y lo aplicado hasta
-    ahora (se actualiza en vivo, sin esperar a que voten todos)."""
+    ahora (se actualiza en vivo, sin esperar a que voten todos). El desglose
+    de resultados (`results`) solo se incluye para administradores; el resto
+    de jugadores solo ve si ha votado y cuánta gente lleva votado."""
     total_participants = match.participants.count()
     submitted_voter_ids = set(
         MatchPerformanceReview.objects.filter(match=match).values_list("voter_id", flat=True)
@@ -801,17 +803,19 @@ def get_performance_review_status(match, user) -> dict:
             for v in MatchPerformanceVote.objects.filter(match=match, voter=user).select_related("target__user")
         ]
 
-    results = [
-        {
-            "player_id": a.target_id,
-            "username": a.target.user.username,
-            "attribute": a.attribute,
-            "delta": a.applied_value,
-        }
-        for a in MatchPerformanceApplied.objects.filter(match=match)
-        .exclude(applied_value=0)
-        .select_related("target__user")
-    ]
+    results = []
+    if user and user.is_authenticated and user.is_staff:
+        results = [
+            {
+                "player_id": a.target_id,
+                "username": a.target.user.username,
+                "attribute": a.attribute,
+                "delta": a.applied_value,
+            }
+            for a in MatchPerformanceApplied.objects.filter(match=match)
+            .exclude(applied_value=0)
+            .select_related("target__user")
+        ]
 
     return {
         "total_participants": total_participants,
