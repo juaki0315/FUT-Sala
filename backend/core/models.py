@@ -93,10 +93,6 @@ class Match(models.Model):
     # el pasado o el futuro.
     finished_at = models.DateTimeField(null=True, blank=True)
     totw_generated_at = models.DateTimeField(null=True, blank=True)
-    # "Revisión de Lloros": se aplica automáticamente en cuanto todos los
-    # convocados han emitido su voto (ver services.submit_performance_review).
-    performance_review_applied = models.BooleanField(default=False)
-    performance_review_applied_at = models.DateTimeField(null=True, blank=True)
 
     def __str__(self):
         return f"Partido {self.date_played:%Y-%m-%d} ({self.team_a_score}-{self.team_b_score})"
@@ -221,8 +217,9 @@ PERFORMANCE_REVIEW_BUDGET = 3
 class MatchPerformanceReview(models.Model):
     """
     Marca que un convocado ya emitió su "Revisión de Lloros" de este
-    partido (aunque no puntúe a nadie). Sirve para saber cuándo han
-    votado todos los convocados y aplicar el resultado automáticamente.
+    partido (aunque no puntúe a nadie). Cada voto se aplica al instante
+    (ver services.submit_performance_review); esto solo sirve para saber
+    quién ha votado ya y evitar que vote dos veces.
     """
 
     match = models.ForeignKey(Match, on_delete=models.CASCADE, related_name="performance_reviews")
@@ -265,3 +262,23 @@ class MatchPerformanceVote(models.Model):
 
     def __str__(self):
         return f"{self.voter} -> {self.target} {self.attribute} {self.delta:+d} [{self.match}]"
+
+
+class MatchPerformanceApplied(models.Model):
+    """
+    Cuánto se ha aplicado ya a la carta de `target` para (partido, atributo)
+    por la Revisión de Lloros. Al llegar un voto nuevo sobre esa misma
+    estadística se recalcula la media entre quienes ya han votado y solo se
+    aplica la diferencia respecto a `applied_value`, para que cada voto
+    surta efecto al instante sin esperar a que voten todos los convocados.
+    """
+
+    ATTR_CHOICES = [(f, f) for f in PERFORMANCE_REVIEW_ATTRS]
+
+    match = models.ForeignKey(Match, on_delete=models.CASCADE, related_name="performance_applied")
+    target = models.ForeignKey(PlayerProfile, on_delete=models.CASCADE, related_name="performance_applied")
+    attribute = models.CharField(max_length=10, choices=ATTR_CHOICES)
+    applied_value = models.SmallIntegerField(default=0)
+
+    class Meta:
+        unique_together = ("match", "target", "attribute")

@@ -14,6 +14,7 @@ from django.utils import timezone
 from .models import (
     InitialVote,
     Match,
+    MatchPerformanceApplied,
     MatchPerformanceReview,
     MatchPerformanceVote,
     MatchPlayer,
@@ -738,37 +739,50 @@ def get_records(request=None) -> list[dict]:
     return records
 
 
-def _aggregate_performance_votes(match) -> list[dict]:
-    """
-    Agrega los votos de la Revisión de Lloros por (jugador, atributo): media
-    de los votos recibidos, redondeada, con tope ±3. Se puede recalcular en
-    cualquier momento a partir de los votos guardados (no se persiste aparte).
-    """
-    votes = MatchPerformanceVote.objects.filter(match=match).select_related("target__user")
-    sums: dict[tuple[int, str], list[int]] = {}
-    usernames: dict[int, str] = {}
-    for v in votes:
-        sums.setdefault((v.target_id, v.attribute), []).append(v.delta)
-        usernames[v.target_id] = v.target.user.username
+def _current_performance_average(match, target_id, attribute) -> int:
+    """Media (redondeada, con tope ±3) de los votos recibidos hasta ahora para
+    (target, attribute), contando solo a quienes han votado esa estadística
+    concreta de ese compañero."""
+    deltas = list(
+        MatchPerformanceVote.objects.filter(match=match, target_id=target_id, attribute=attribute).values_list(
+            "delta", flat=True
+        )
+    )
+    if not deltas:
+        return 0
+    avg = round(sum(deltas) / len(deltas))
+    return max(-PERFORMANCE_REVIEW_MAX_DELTA, min(PERFORMANCE_REVIEW_MAX_DELTA, avg))
 
-    results = []
-    for (target_id, attribute), deltas in sums.items():
-        avg = round(sum(deltas) / len(deltas))
-        avg = max(-PERFORMANCE_REVIEW_MAX_DELTA, min(PERFORMANCE_REVIEW_MAX_DELTA, avg))
-        if avg != 0:
-            results.append({
-                "player_id": target_id,
-                "username": usernames[target_id],
-                "attribute": attribute,
-                "delta": avg,
-            })
-    return results
+
+@transaction.atomic
+def _reconcile_performance_vote(match, target_id, attribute) -> None:
+    """
+    Recalcula la media de la Revisión de Lloros para (target, attribute) con
+    los votos recibidos hasta ahora y aplica solo la diferencia respecto a lo
+    que ya se había aplicado antes, para que cada voto nuevo actualice la
+    carta al instante sin esperar a que voten el resto de convocados.
+    """
+    new_avg = _current_performance_average(match, target_id, attribute)
+    tracker, _ = MatchPerformanceApplied.objects.get_or_create(
+        match=match, target_id=target_id, attribute=attribute, defaults={"applied_value": 0}
+    )
+    incremental = new_avg - tracker.applied_value
+    if incremental == 0:
+        return
+
+    profile = PlayerProfile.objects.get(pk=target_id)
+    current = getattr(profile, attribute)
+    setattr(profile, attribute, max(1, min(99, current + incremental)))
+    profile.save(update_fields=[attribute])
+
+    tracker.applied_value = new_avg
+    tracker.save(update_fields=["applied_value"])
 
 
 def get_performance_review_status(match, user) -> dict:
     """Estado de la Revisión de Lloros de un partido para la UI: cuánta gente
-    ha votado, lo que votó el usuario actual (si votó), y el resultado final
-    si ya se aplicó."""
+    ha votado, lo que votó el usuario actual (si votó), y lo aplicado hasta
+    ahora (se actualiza en vivo, sin esperar a que voten todos)."""
     total_participants = match.participants.count()
     submitted_voter_ids = set(
         MatchPerformanceReview.objects.filter(match=match).values_list("voter_id", flat=True)
@@ -787,27 +801,25 @@ def get_performance_review_status(match, user) -> dict:
             for v in MatchPerformanceVote.objects.filter(match=match, voter=user).select_related("target__user")
         ]
 
+    results = [
+        {
+            "player_id": a.target_id,
+            "username": a.target.user.username,
+            "attribute": a.attribute,
+            "delta": a.applied_value,
+        }
+        for a in MatchPerformanceApplied.objects.filter(match=match)
+        .exclude(applied_value=0)
+        .select_related("target__user")
+    ]
+
     return {
         "total_participants": total_participants,
         "submitted_count": len(submitted_voter_ids),
         "has_submitted": has_submitted,
         "my_votes": my_votes,
-        "applied": match.performance_review_applied,
-        "results": _aggregate_performance_votes(match) if match.performance_review_applied else None,
+        "results": results,
     }
-
-
-@transaction.atomic
-def _apply_performance_review(match) -> None:
-    for r in _aggregate_performance_votes(match):
-        profile = PlayerProfile.objects.get(id=r["player_id"])
-        current = getattr(profile, r["attribute"])
-        setattr(profile, r["attribute"], max(1, min(99, current + r["delta"])))
-        profile.save(update_fields=[r["attribute"]])
-
-    match.performance_review_applied = True
-    match.performance_review_applied_at = timezone.now()
-    match.save(update_fields=["performance_review_applied", "performance_review_applied_at"])
 
 
 @transaction.atomic
@@ -817,14 +829,12 @@ def submit_performance_review(match, user, entries: list[dict]) -> None:
     convocados de `match`. `entries`: [{"target": player_id, "attribute": str, "delta": int}, ...]
     Por cada compañero, el votante reparte como mucho PERFORMANCE_REVIEW_BUDGET
     puntos en total (sumando valores absolutos) entre los 6 atributos, p.ej.
-    +2 regate y +1 fisico. Un voto por partido y persona, no editable. Si con
-    este voto ya han votado todos los convocados, se aplica el resultado
-    automáticamente.
+    +2 regate y +1 fisico. Un voto por partido y persona, no editable. Cada
+    voto se aplica al instante (recalculando la media entre quienes ya han
+    votado esa estadística concreta), sin esperar a que voten el resto.
     """
     if not match.is_finished:
         raise ValueError("El partido todavía no ha finalizado.")
-    if match.performance_review_applied:
-        raise ValueError("La Revisión de Lloros de este partido ya se ha cerrado.")
 
     voter_mp = match.participants.filter(player__user=user).first()
     if not voter_mp:
@@ -871,7 +881,5 @@ def submit_performance_review(match, user, entries: list[dict]) -> None:
     MatchPerformanceReview.objects.create(match=match, voter=user)
     MatchPerformanceVote.objects.bulk_create(to_create)
 
-    total_participants = match.participants.count()
-    submitted = MatchPerformanceReview.objects.filter(match=match).count()
-    if submitted >= total_participants:
-        _apply_performance_review(match)
+    for target_id, attribute in seen:
+        _reconcile_performance_vote(match, target_id, attribute)

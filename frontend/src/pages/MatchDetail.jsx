@@ -602,44 +602,40 @@ export default function MatchDetail() {
               <Scale size={13} /> Revisión de Lloros
             </h2>
 
-            {reviewStatus.applied ? (
-              <div className="surface rounded-xl p-3 space-y-1.5">
-                {!reviewStatus.results || reviewStatus.results.length === 0 ? (
-                  <div className="text-sm text-floodlight-300/40 text-center py-2">
-                    Nadie tuvo quejas esta semana.
+            {reviewStatus.results.length > 0 && (
+              <div className="surface rounded-xl p-3 space-y-1.5 mb-3">
+                {reviewStatus.results.map((r, i) => (
+                  <div key={i} className="flex items-center justify-between text-sm">
+                    <span className="text-floodlight-300">
+                      {r.username} <span className="text-floodlight-300/40">· {REVIEW_ATTR_LABEL[r.attribute]}</span>
+                    </span>
+                    <span
+                      className={`font-display text-lg ${
+                        r.delta > 0 ? "text-floodlight-400" : "text-red-300"
+                      }`}
+                    >
+                      {r.delta > 0 ? `+${r.delta}` : r.delta}
+                    </span>
                   </div>
-                ) : (
-                  reviewStatus.results.map((r, i) => (
-                    <div key={i} className="flex items-center justify-between text-sm">
-                      <span className="text-floodlight-300">
-                        {r.username} <span className="text-floodlight-300/40">· {REVIEW_ATTR_LABEL[r.attribute]}</span>
-                      </span>
-                      <span
-                        className={`font-display text-lg ${
-                          r.delta > 0 ? "text-floodlight-400" : "text-red-300"
-                        }`}
-                      >
-                        {r.delta > 0 ? `+${r.delta}` : r.delta}
-                      </span>
-                    </div>
-                  ))
-                )}
+                ))}
               </div>
-            ) : !isParticipant ? (
+            )}
+
+            {!isParticipant ? (
               <div className="rounded-xl border border-dashed border-pitch-700 p-4 text-center text-sm text-floodlight-300/40">
                 Solo pueden participar los convocados a este partido.
               </div>
             ) : reviewStatus.has_submitted ? (
               <div className="surface rounded-xl p-3 text-sm text-floodlight-300/60 text-center">
-                Ya has enviado tu Revisión de Lloros. Esperando a los demás ({reviewStatus.submitted_count}/
-                {reviewStatus.total_participants}).
+                Ya has enviado tu Revisión de Lloros. Los cambios se aplican al instante conforme van votando (
+                {reviewStatus.submitted_count}/{reviewStatus.total_participants} han votado).
               </div>
             ) : (
               <>
                 <p className="text-xs text-floodlight-300/40 mb-3">
                   Para cada compañero, reparte hasta {REVIEW_BUDGET} puntos (subir o bajar) entre sus atributos —
-                  p.ej. +2 regate y +1 físico. Es opcional por jugador. Se aplica en cuanto voten todos los
-                  convocados.
+                  p.ej. +2 regate y +1 físico. Es opcional por jugador. Se aplica al instante, sin esperar a que
+                  voten los demás.
                 </p>
                 <div className="space-y-2">
                   {voteCandidates.map((mp) => {

@@ -400,8 +400,8 @@ class MatchViewSet(viewsets.ModelViewSet):
         """
         "Revisión de Lloros": un convocado reparte, para cada compañero
         convocado (opcional), hasta 3 puntos (subir o bajar) entre los 6
-        atributos, p.ej. +2 regate y +1 fisico. En cuanto han votado todos
-        los convocados, se aplica automáticamente.
+        atributos, p.ej. +2 regate y +1 fisico. Se aplica al instante, sin
+        esperar a que voten el resto de convocados.
         Body: {"votes": [{"target": player_id, "attribute": str, "delta": int}, ...]}
         """
         match = self.get_object()
